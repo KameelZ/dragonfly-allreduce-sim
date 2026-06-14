@@ -76,7 +76,7 @@ The topology is configurable from the command line:
 | `--delay` | `1ms` | Per-link delay |
 | `--global-links` | `1` | Global links per group pair |
 | `--test` | off | Run a non-interactive `pingall` and exit pass/fail |
-| `--stp-wait` | `30` | Seconds to wait for STP to converge in `--test` mode |
+| `--settle` | `1` | Seconds to wait after installing flows before the `--test` ping |
 
 Example — a larger network with richer global bandwidth:
 
@@ -86,8 +86,8 @@ sudo python3 dragonfly_topo.py --groups 4 --routers 3 --hosts 2 --global-links 2
 
 ### Smoke test
 
-Verify end-to-end connectivity without the interactive CLI. This waits for STP
-to converge, runs an all-pairs ping, and exits non-zero on any packet loss:
+Verify end-to-end connectivity without the interactive CLI. This installs the
+forwarding flows, runs an all-pairs ping, and exits non-zero on any packet loss:
 
 ```bash
 sudo python3 dragonfly_topo.py --test
@@ -107,8 +107,9 @@ echo $?   # 0 = all hosts reachable, 1 = packet loss
 - [x] Foundational Mininet boilerplate and modular Dragonfly topology skeleton
 - [x] Full Dragonfly global-link assignment
 - [x] Command-line configuration (groups / routers / hosts / bandwidth)
+- [x] Deterministic shortest-path forwarding (flow-based, controller-less)
+- [ ] g-PAARD adaptive, load-aware routing policy
 - [ ] Dragonfly+ topology variant
-- [ ] g-PAARD routing algorithm implementation
 - [ ] Dynamic traffic load generators (iperf / custom)
 - [ ] Metrics collection and analysis
 

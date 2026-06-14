@@ -21,12 +21,14 @@ marked with explicit injection points so they can be implemented incrementally.
 
 from mininet.topo import Topo
 from mininet.net import Mininet
-from mininet.node import OVSBridge, RemoteController
+from mininet.node import OVSSwitch, RemoteController
 from mininet.link import TCLink
 from mininet.cli import CLI
 from mininet.log import setLogLevel, info
 from mininet.clean import cleanup
 
+from collections import deque
+from functools import partial
 import argparse
 import sys
 import time
@@ -144,18 +146,127 @@ class DragonflyTopo(Topo):
 # ---------------------------------------------------------------------------
 # g-PAARD routing — INJECTION POINT
 # ---------------------------------------------------------------------------
-def install_gpaard_routing(net):
-    """Install the g-PAARD routing algorithm onto the running network.
+def _build_switch_graph(net):
+    """Derive the router graph and host attachments from the running network.
 
-    TODO (CDR deliverable): Implement g-PAARD here.
-        - Compute / install forwarding rules (flows) per router.
-        - Apply the adaptive, load-aware path selection that g-PAARD specifies.
-        - Hook into the controller if using a RemoteController/SDN approach.
+    Returns:
+        adj:          {switch_name: {neighbor_switch_name: local_Intf}}
+        host_attach:  {host_name: (switch_name, switch_side_Intf)}
 
-    For now this is a no-op placeholder so the network boots cleanly.
+    The Intf objects are read straight from Mininet's live link list, so the
+    OpenFlow port numbers derived from them (via ``switch.ports[intf]``) match
+    the actual datapath — no guessing about link-creation order.
     """
-    info("*** [g-PAARD] routing not yet implemented (placeholder)\n")
-    # >>> g-PAARD routing logic will be injected here <<<
+    switch_names = {s.name for s in net.switches}
+    adj = {s.name: {} for s in net.switches}
+    host_attach = {}
+
+    for link in net.links:
+        intf_a, intf_b = link.intf1, link.intf2
+        node_a, node_b = intf_a.node, intf_b.node
+        a_is_sw = node_a.name in switch_names
+        b_is_sw = node_b.name in switch_names
+
+        if a_is_sw and b_is_sw:
+            adj[node_a.name][node_b.name] = intf_a
+            adj[node_b.name][node_a.name] = intf_b
+        elif a_is_sw and not b_is_sw:
+            host_attach[node_b.name] = (node_a.name, intf_a)
+        elif b_is_sw and not a_is_sw:
+            host_attach[node_a.name] = (node_b.name, intf_b)
+
+    return adj, host_attach
+
+
+def _shortest_path_next_hops(adj, dst_switch):
+    """BFS from ``dst_switch`` over the router graph.
+
+    Returns ``next_hop[switch] = neighbor`` giving, for every switch, the
+    neighbour to forward to in order to make progress toward ``dst_switch``
+    along a shortest path. Neighbours are visited in sorted order so the result
+    is deterministic (a fixed shortest-path tree per destination).
+
+    Per-destination shortest-path forwarding is inherently loop-free, which is
+    why this replaces STP entirely: there is no spanning tree and no flooding,
+    so the network uses the real Dragonfly link diversity instead of collapsing
+    onto one tree.
+    """
+    next_hop = {}
+    visited = {dst_switch}
+    queue = deque([dst_switch])
+    while queue:
+        current = queue.popleft()
+        for neighbor in sorted(adj[current]):
+            if neighbor not in visited:
+                visited.add(neighbor)
+                next_hop[neighbor] = current
+                queue.append(neighbor)
+    return next_hop
+
+
+def select_path_next_hop(switch_name, dst_switch, adj, shortest_tree):
+    """Choose the next-hop neighbour for traffic at ``switch_name``.
+
+    >>> g-PAARD INJECTION POINT <<<
+    This is the single decision function the routing layer consults for every
+    (current switch, destination) pair. Right now it returns the deterministic
+    *minimal* (shortest-path) next hop, which is exactly the baseline that
+    g-PAARD is evaluated against.
+
+    To implement g-PAARD, replace the body so the choice becomes adaptive and
+    load-aware: weigh the minimal next hop against non-minimal (e.g. via an
+    intermediate group) hops using live link-load, and apply g-PAARD's
+    progressive / adversary-resistant selection rule. The surrounding
+    install_routing() machinery (flow installation, port lookup) does not need
+    to change — only this policy does.
+    """
+    return shortest_tree.get(switch_name)
+
+
+def install_gpaard_routing(net):
+    """Install destination-based forwarding flows on every switch.
+
+    Strategy (controller-less, deterministic):
+        - Hosts use static ARP (set in main), so no broadcast/flooding occurs.
+        - For each destination host we compute a shortest-path tree over the
+          router graph and, at every switch, install one flow matching the
+          host's destination MAC and outputting toward the chosen next hop.
+        - The next hop is chosen by select_path_next_hop(), the g-PAARD policy
+          hook, so swapping in the adaptive algorithm later touches one place.
+
+    Switches run in OVS 'secure' fail-mode (default for OVSSwitch) with no
+    controller, so only these explicitly installed flows forward traffic.
+    """
+    info("*** [routing] computing and installing forwarding flows\n")
+    adj, host_attach = _build_switch_graph(net)
+
+    # Start from a clean slate so re-installs are idempotent.
+    for switch in net.switches:
+        switch.cmd("ovs-vsctl set-fail-mode", switch.name, "secure")
+        switch.dpctl("del-flows")
+
+    flow_count = 0
+    for host in net.hosts:
+        dst_switch_name, dst_side_intf = host_attach[host.name]
+        dst_mac = host.MAC()
+        shortest_tree = _shortest_path_next_hops(adj, dst_switch_name)
+
+        for switch in net.switches:
+            if switch.name == dst_switch_name:
+                # Destination is local: hand the frame straight to the host.
+                out_port = switch.ports[dst_side_intf]
+            else:
+                next_hop = select_path_next_hop(
+                    switch.name, dst_switch_name, adj, shortest_tree)
+                if next_hop is None:
+                    continue  # no path (should not happen in a connected DF)
+                out_port = switch.ports[adj[switch.name][next_hop]]
+
+            switch.dpctl("add-flow", f"dl_dst={dst_mac},actions=output:{out_port}")
+            flow_count += 1
+
+    info(f"*** [routing] installed {flow_count} flows across "
+         f"{len(net.switches)} switches\n")
     return
 
 
@@ -191,18 +302,16 @@ def build_network(args):
         global_links_per_pair=args.global_links,
     )
 
-    # OVSBridge runs each switch as a standalone OVS learning bridge with NO
-    # external controller, so the network boots without any controller binary
-    # installed. STP is enabled (below) so the loops in the Dragonfly mesh do
-    # not create broadcast storms.
-    #
-    # When the g-PAARD/SDN controller is ready, swap OVSBridge for OVSSwitch and
-    # add a RemoteController so g-PAARD can install flows programmatically.
+    # OVSSwitch defaults to OVS 'secure' fail-mode, so with no controller each
+    # switch drops all traffic until we install explicit flows in
+    # install_gpaard_routing(). This gives us full, deterministic control of
+    # forwarding (no STP, no flooding) while still requiring no controller
+    # binary. Swap in a RemoteController here if/when an SDN controller is used.
     net = Mininet(
         topo=topo,
-        switch=OVSBridge,
+        switch=OVSSwitch,
         link=TCLink,
-        controller=None,  # standalone bridges need no controller
+        controller=None,  # controller-less: forwarding driven by installed flows
         autoSetMacs=True,
     )
     return net
@@ -227,9 +336,9 @@ def parse_args(argv=None):
     parser.add_argument("--test", action="store_true",
                         help="run a non-interactive pingall and exit with a "
                              "pass/fail status instead of opening the CLI")
-    parser.add_argument("--stp-wait", type=int, default=30,
-                        help="seconds to wait for STP convergence in --test "
-                             "mode (default: 30)")
+    parser.add_argument("--settle", type=int, default=1,
+                        help="seconds to wait after installing flows before "
+                             "the --test pingall (default: 1)")
     return parser.parse_args(argv)
 
 
@@ -252,23 +361,27 @@ def main():
     try:
         net.start()
 
-        # Enable STP on every bridge so the redundant local/global links in the
-        # Dragonfly mesh do not cause L2 broadcast storms while running in
-        # standalone (controller-less) mode.
-        info("*** Enabling STP on switches\n")
-        for switch in net.switches:
-            switch.cmd(f"ovs-vsctl set bridge {switch.name} stp_enable=true")
+        # Populate static ARP entries on every host so no host ever needs to
+        # broadcast an ARP request. Combined with secure-mode switches, this
+        # means the ONLY traffic in the network is unicast we explicitly route
+        # — no flooding, so the Dragonfly loops are harmless without STP.
+        info("*** Installing static ARP entries\n")
+        net.staticArp()
 
-        # Injection points (currently no-ops):
+        # Install the (currently shortest-path) forwarding flows. This is the
+        # g-PAARD injection point.
         install_gpaard_routing(net)
+
+        # Traffic generators (currently a no-op placeholder).
         start_traffic_load(net)
 
         if args.test:
-            # Non-interactive verification: wait for STP to converge, then run
-            # an all-pairs ping. Exit non-zero on any packet loss so this can be
+            # Non-interactive verification: let flows settle, then run an
+            # all-pairs ping. Exit non-zero on any packet loss so this can be
             # used as a smoke test in scripts / CI.
-            info(f"*** Test mode: waiting {args.stp_wait}s for STP to converge\n")
-            time.sleep(args.stp_wait)
+            if args.settle:
+                info(f"*** Test mode: letting flows settle for {args.settle}s\n")
+                time.sleep(args.settle)
             info("*** Running pingall\n")
             loss = net.pingAll()
             if loss == 0.0:
@@ -278,8 +391,8 @@ def main():
                 exit_code = 1
         else:
             info("*** Network is up. Dropping to Mininet CLI.\n")
-            info("*** Note: with STP enabled, allow a few seconds for the spanning\n")
-            info("***       tree to converge before the first 'pingall'.\n")
+            info("*** Forwarding flows are installed; 'pingall' should pass "
+                 "immediately.\n")
             CLI(net)
     finally:
         # Always tear down, even if startup or the CLI raises, so we never
