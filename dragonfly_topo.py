@@ -27,6 +27,10 @@ from mininet.cli import CLI
 from mininet.log import setLogLevel, info
 from mininet.clean import cleanup
 
+import argparse
+import sys
+import time
+
 
 # ---------------------------------------------------------------------------
 # Topology definition
@@ -46,13 +50,14 @@ class DragonflyTopo(Topo):
     """
 
     def __init__(self, num_groups=2, routers_per_group=2, hosts_per_router=1,
-                 link_bw=10, link_delay="1ms", **kwargs):
+                 link_bw=10, link_delay="1ms", global_links_per_pair=1, **kwargs):
         # Store design parameters before Topo.__init__ triggers build().
         self.num_groups = num_groups
         self.routers_per_group = routers_per_group
         self.hosts_per_router = hosts_per_router
         self.link_bw = link_bw
         self.link_delay = link_delay
+        self.global_links_per_pair = global_links_per_pair
 
         # Bookkeeping for switches/hosts so routing logic can reason about them.
         # NOTE: these are deliberately NOT named `hosts`/`switches`, which would
@@ -109,15 +114,31 @@ class DragonflyTopo(Topo):
     def _add_global_links(self):
         """Wire groups together with inter-group (global) links.
 
-        Minimal scheme: connect router 0 of each group to router 0 of every
-        other group. Replace with the full Dragonfly global-link assignment
-        (and Dragonfly+ variant) as the design is finalized.
+        Canonical Dragonfly connects every pair of groups with (at least) one
+        global link. Rather than hanging all global links off router 0, the
+        endpoint routers are chosen round-robin within each group so the global
+        links are spread evenly across the routers of a group. This balances
+        global-port usage and gives the routing algorithm genuine path
+        diversity to exploit.
+
+        `global_links_per_pair` controls how many parallel global links connect
+        each group pair (1 = sparse/canonical, higher = richer global bandwidth).
         """
+        # Per-group cursor for round-robin router selection.
+        next_router = {g: 0 for g in range(self.num_groups)}
+
         for g1 in range(self.num_groups):
             for g2 in range(g1 + 1, self.num_groups):
-                r1 = self.router_map[(g1, 0)]
-                r2 = self.router_map[(g2, 0)]
-                self.addLink(r1, r2, bw=self.link_bw, delay=self.link_delay)
+                for _ in range(self.global_links_per_pair):
+                    r1 = next_router[g1] % self.routers_per_group
+                    r2 = next_router[g2] % self.routers_per_group
+                    next_router[g1] += 1
+                    next_router[g2] += 1
+
+                    sw1 = self.router_map[(g1, r1)]
+                    sw2 = self.router_map[(g2, r2)]
+                    self.addLink(sw1, sw2,
+                                 bw=self.link_bw, delay=self.link_delay)
 
 
 # ---------------------------------------------------------------------------
@@ -159,12 +180,15 @@ def start_traffic_load(net):
 # ---------------------------------------------------------------------------
 # Network factory
 # ---------------------------------------------------------------------------
-def build_network():
+def build_network(args):
     """Instantiate the Mininet network with the Dragonfly topology."""
     topo = DragonflyTopo(
-        num_groups=2,
-        routers_per_group=2,
-        hosts_per_router=1,
+        num_groups=args.groups,
+        routers_per_group=args.routers,
+        hosts_per_router=args.hosts,
+        link_bw=args.bw,
+        link_delay=args.delay,
+        global_links_per_pair=args.global_links,
     )
 
     # OVSBridge runs each switch as a standalone OVS learning bridge with NO
@@ -184,11 +208,37 @@ def build_network():
     return net
 
 
+def parse_args(argv=None):
+    """Parse command-line configuration for the Dragonfly simulation."""
+    parser = argparse.ArgumentParser(
+        description="Dragonfly / Dragonfly+ topology simulation in Mininet.")
+    parser.add_argument("-g", "--groups", type=int, default=2,
+                        help="number of Dragonfly groups (default: 2)")
+    parser.add_argument("-r", "--routers", type=int, default=2,
+                        help="routers per group (default: 2)")
+    parser.add_argument("-H", "--hosts", type=int, default=1,
+                        help="hosts per router (default: 1)")
+    parser.add_argument("--bw", type=float, default=10,
+                        help="link bandwidth in Mbit/s (default: 10)")
+    parser.add_argument("--delay", type=str, default="1ms",
+                        help="per-link delay, e.g. '1ms' (default: 1ms)")
+    parser.add_argument("--global-links", type=int, default=1,
+                        help="global links per group pair (default: 1)")
+    parser.add_argument("--test", action="store_true",
+                        help="run a non-interactive pingall and exit with a "
+                             "pass/fail status instead of opening the CLI")
+    parser.add_argument("--stp-wait", type=int, default=30,
+                        help="seconds to wait for STP convergence in --test "
+                             "mode (default: 30)")
+    return parser.parse_args(argv)
+
+
 # ---------------------------------------------------------------------------
 # Entry point
 # ---------------------------------------------------------------------------
 def main():
     setLogLevel("info")
+    args = parse_args()
 
     # Clear any leftover Mininet state (dangling interfaces, stale OVS bridges,
     # orphaned controllers) from a previous run that may not have shut down
@@ -196,7 +246,8 @@ def main():
     info("*** Cleaning up any stale Mininet state\n")
     cleanup()
 
-    net = build_network()
+    net = build_network(args)
+    exit_code = 0
 
     try:
         net.start()
@@ -212,15 +263,31 @@ def main():
         install_gpaard_routing(net)
         start_traffic_load(net)
 
-        info("*** Network is up. Dropping to Mininet CLI.\n")
-        info("*** Note: with STP enabled, allow a few seconds for the spanning\n")
-        info("***       tree to converge before the first 'pingall'.\n")
-        CLI(net)
+        if args.test:
+            # Non-interactive verification: wait for STP to converge, then run
+            # an all-pairs ping. Exit non-zero on any packet loss so this can be
+            # used as a smoke test in scripts / CI.
+            info(f"*** Test mode: waiting {args.stp_wait}s for STP to converge\n")
+            time.sleep(args.stp_wait)
+            info("*** Running pingall\n")
+            loss = net.pingAll()
+            if loss == 0.0:
+                info("*** TEST PASSED: 0% packet loss\n")
+            else:
+                info(f"*** TEST FAILED: {loss:.1f}% packet loss\n")
+                exit_code = 1
+        else:
+            info("*** Network is up. Dropping to Mininet CLI.\n")
+            info("*** Note: with STP enabled, allow a few seconds for the spanning\n")
+            info("***       tree to converge before the first 'pingall'.\n")
+            CLI(net)
     finally:
         # Always tear down, even if startup or the CLI raises, so we never
         # leave dangling interfaces behind.
         net.stop()
 
+    return exit_code
+
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())
