@@ -14,9 +14,14 @@ Project goal (CDR scope):
     - Implement and analyze the g-PAARD routing algorithm.
     - Drive the network with dynamic/synthetic traffic loads and collect metrics.
 
-This file intentionally provides ONLY a clean, modular skeleton that boots in
-Mininet. The g-PAARD routing logic and traffic generators are stubbed out and
-marked with explicit injection points so they can be implemented incrementally.
+This file holds the canonical DragonflyTopo plus all shared, topology-agnostic
+infrastructure: g-PAARD routing, the traffic-load stub, the Mininet network
+factory, and the CLI. The Dragonfly+ topology (DragonflyPlusTopo) lives in
+dragonfly_plus_topo.py and is imported here so build_network() can select
+between the two via --topology.
+
+The g-PAARD routing logic and traffic generators are stubbed out and marked
+with explicit injection points so they can be implemented incrementally.
 """
 
 from mininet.topo import Topo
@@ -33,10 +38,27 @@ import argparse
 import sys
 import time
 
+from dragonfly_plus_topo import DragonflyPlusTopo
+
 
 # ---------------------------------------------------------------------------
 # Topology definition
 # ---------------------------------------------------------------------------
+def _per_group(value, num_groups, name):
+    """Normalize a `routers_per_group`/`hosts_per_router`-style argument into
+    a per-group list of length `num_groups`. A single int is broadcast to
+    every group (the common, symmetric case); a sequence lets each group
+    have its own count (asymmetric groups)."""
+    if isinstance(value, int):
+        return [value] * num_groups
+    values = list(value)
+    if len(values) != num_groups:
+        raise ValueError(
+            f"{name} must be an int or a sequence of length num_groups "
+            f"({num_groups}), got length {len(values)}")
+    return values
+
+
 class DragonflyTopo(Topo):
     """Custom Dragonfly topology.
 
@@ -44,6 +66,11 @@ class DragonflyTopo(Topo):
     contains `routers_per_group` routers connected by intra-group (local) links.
     Groups are connected to one another by inter-group (global) links. Each
     router hosts `hosts_per_router` end hosts.
+
+    `routers_per_group` and `hosts_per_router` each accept either a single int
+    (broadcast to every group, the canonical symmetric Dragonfly) or a
+    sequence of length `num_groups` giving each group its own router/host
+    count (asymmetric groups).
 
     The current implementation wires up a minimal, fully-modular skeleton so the
     network boots cleanly. Exact Dragonfly wiring (all-to-all intra-group and the
@@ -55,8 +82,10 @@ class DragonflyTopo(Topo):
                  link_bw=10, link_delay="1ms", global_links_per_pair=1, **kwargs):
         # Store design parameters before Topo.__init__ triggers build().
         self.num_groups = num_groups
-        self.routers_per_group = routers_per_group
-        self.hosts_per_router = hosts_per_router
+        self.routers_per_group = _per_group(routers_per_group, num_groups, "routers_per_group")
+        self.hosts_per_router = _per_group(hosts_per_router, num_groups, "hosts_per_router")
+        if any(r < 1 for r in self.routers_per_group):
+            raise ValueError("every group needs at least 1 router")
         self.link_bw = link_bw
         self.link_delay = link_delay
         self.global_links_per_pair = global_links_per_pair
@@ -77,9 +106,9 @@ class DragonflyTopo(Topo):
 
         # 1. Create routers (switches) and their attached hosts.
         for g in range(self.num_groups):
-            for r in range(self.routers_per_group):
+            for r in range(self.routers_per_group[g]):
                 sw_name = self._add_router(g, r)
-                for h in range(self.hosts_per_router):
+                for h in range(self.hosts_per_router[g]):
                     self._add_host(g, r, h, sw_name)
 
         # 2. Intra-group (local) links: all-to-all within each group.
@@ -107,7 +136,7 @@ class DragonflyTopo(Topo):
     def _add_local_links(self):
         """Wire all routers within a group to each other (all-to-all)."""
         for g in range(self.num_groups):
-            routers = [self.router_map[(g, r)] for r in range(self.routers_per_group)]
+            routers = [self.router_map[(g, r)] for r in range(self.routers_per_group[g])]
             for i in range(len(routers)):
                 for j in range(i + 1, len(routers)):
                     self.addLink(routers[i], routers[j],
@@ -132,8 +161,8 @@ class DragonflyTopo(Topo):
         for g1 in range(self.num_groups):
             for g2 in range(g1 + 1, self.num_groups):
                 for _ in range(self.global_links_per_pair):
-                    r1 = next_router[g1] % self.routers_per_group
-                    r2 = next_router[g2] % self.routers_per_group
+                    r1 = next_router[g1] % self.routers_per_group[g1]
+                    r2 = next_router[g2] % self.routers_per_group[g2]
                     next_router[g1] += 1
                     next_router[g2] += 1
 
@@ -141,6 +170,12 @@ class DragonflyTopo(Topo):
                     sw2 = self.router_map[(g2, r2)]
                     self.addLink(sw1, sw2,
                                  bw=self.link_bw, delay=self.link_delay)
+
+    def topology_label(self):
+        """Short human-readable description of this topology's parameters,
+        for use in plot titles / logs."""
+        return (f"Dragonfly -- groups={self.num_groups}, routers/group={self.routers_per_group}, "
+                f"hosts/router={self.hosts_per_router}, global={self.global_links_per_pair}")
 
 
 # ---------------------------------------------------------------------------
@@ -207,18 +242,21 @@ def _shortest_path_next_hops(adj, dst_switch):
 def select_path_next_hop(switch_name, dst_switch, adj, shortest_tree):
     """Choose the next-hop neighbour for traffic at ``switch_name``.
 
-    >>> g-PAARD INJECTION POINT <<<
+    >>> ADAPTIVE ROUTING INJECTION POINT <<<
     This is the single decision function the routing layer consults for every
     (current switch, destination) pair. Right now it returns the deterministic
-    *minimal* (shortest-path) next hop, which is exactly the baseline that
-    g-PAARD is evaluated against.
+    *minimal* (shortest-path) next hop -- the "MIN routing" baseline the
+    g-PAARD paper evaluates against (see gpaard.py).
 
-    To implement g-PAARD, replace the body so the choice becomes adaptive and
-    load-aware: weigh the minimal next hop against non-minimal (e.g. via an
-    intermediate group) hops using live link-load, and apply g-PAARD's
-    progressive / adversary-resistant selection rule. The surrounding
-    install_routing() machinery (flow installation, port lookup) does not need
-    to change — only this policy does.
+    NOTE: g-PAARD itself is NOT implemented here. g-PAARD (gpaard.py) is an
+    all-reduce communication *pattern* -- it decides which hosts exchange
+    data and in what order -- and runs unchanged on top of whatever unicast
+    routing this function produces. This injection point is for swapping in
+    an *adaptive/load-aware routing* policy instead (e.g. UGAL: weigh the
+    minimal next hop against non-minimal, via-an-intermediate-group hops
+    using live link-load). The surrounding install_gpaard_routing() machinery
+    (flow installation, port lookup) does not need to change -- only this
+    policy does.
     """
     return shortest_tree.get(switch_name)
 
@@ -226,13 +264,19 @@ def select_path_next_hop(switch_name, dst_switch, adj, shortest_tree):
 def install_gpaard_routing(net):
     """Install destination-based forwarding flows on every switch.
 
+    Despite the name (kept for continuity with earlier milestones), this
+    installs plain unicast routing -- it's the underlying transport g-PAARD's
+    all-reduce message schedule (gpaard.py) runs on top of, not g-PAARD
+    itself.
+
     Strategy (controller-less, deterministic):
         - Hosts use static ARP (set in main), so no broadcast/flooding occurs.
         - For each destination host we compute a shortest-path tree over the
           router graph and, at every switch, install one flow matching the
           host's destination MAC and outputting toward the chosen next hop.
-        - The next hop is chosen by select_path_next_hop(), the g-PAARD policy
-          hook, so swapping in the adaptive algorithm later touches one place.
+        - The next hop is chosen by select_path_next_hop(), the adaptive-
+          routing policy hook, so swapping in a load-aware algorithm later
+          touches one place.
 
     Switches run in OVS 'secure' fail-mode (default for OVSSwitch) with no
     controller, so only these explicitly installed flows forward traffic.
@@ -292,15 +336,26 @@ def start_traffic_load(net):
 # Network factory
 # ---------------------------------------------------------------------------
 def build_network(args):
-    """Instantiate the Mininet network with the Dragonfly topology."""
-    topo = DragonflyTopo(
-        num_groups=args.groups,
-        routers_per_group=args.routers,
-        hosts_per_router=args.hosts,
-        link_bw=args.bw,
-        link_delay=args.delay,
-        global_links_per_pair=args.global_links,
-    )
+    """Instantiate the Mininet network with the chosen Dragonfly topology."""
+    if args.topology == "dragonfly+":
+        topo = DragonflyPlusTopo(
+            num_groups=args.groups,
+            leaves_per_group=args.leaves,
+            spines_per_group=args.spines,
+            hosts_per_leaf=args.hosts,
+            link_bw=args.bw,
+            link_delay=args.delay,
+            global_links_per_pair=args.global_links,
+        )
+    else:
+        topo = DragonflyTopo(
+            num_groups=args.groups,
+            routers_per_group=args.routers,
+            hosts_per_router=args.hosts,
+            link_bw=args.bw,
+            link_delay=args.delay,
+            global_links_per_pair=args.global_links,
+        )
 
     # OVSSwitch defaults to OVS 'secure' fail-mode, so with no controller each
     # switch drops all traffic until we install explicit flows in
@@ -321,12 +376,20 @@ def parse_args(argv=None):
     """Parse command-line configuration for the Dragonfly simulation."""
     parser = argparse.ArgumentParser(
         description="Dragonfly / Dragonfly+ topology simulation in Mininet.")
+    parser.add_argument("-t", "--topology", choices=["dragonfly", "dragonfly+"], default="dragonfly",
+                        help="topology variant: canonical Dragonfly (all-to-all "
+                             "routers per group) or Dragonfly+ (leaf-spine fabric "
+                             "per group) (default: dragonfly)")
     parser.add_argument("-g", "--groups", type=int, default=2,
                         help="number of Dragonfly groups (default: 2)")
     parser.add_argument("-r", "--routers", type=int, default=2,
-                        help="routers per group (default: 2)")
+                        help="routers per group, dragonfly only (default: 2)")
+    parser.add_argument("--leaves", type=int, default=2,
+                        help="leaf routers per group, dragonfly+ only (default: 2)")
+    parser.add_argument("--spines", type=int, default=2,
+                        help="spine routers per group, dragonfly+ only (default: 2)")
     parser.add_argument("-H", "--hosts", type=int, default=1,
-                        help="hosts per router (default: 1)")
+                        help="hosts per router (dragonfly) / per leaf (dragonfly+) (default: 1)")
     parser.add_argument("--bw", type=float, default=10,
                         help="link bandwidth in Mbit/s (default: 10)")
     parser.add_argument("--delay", type=str, default="1ms",
