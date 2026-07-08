@@ -16,7 +16,10 @@ import pytest
 
 from dragonfly_topo import DragonflyTopo
 from dragonfly_plus_topo import DragonflyPlusTopo
-from gpaard import build_gpaard_schedule, simulate_allreduce, group_hosts, _designated_global_switch
+from gpaard import (
+    build_gpaard_schedule, simulate_allreduce, group_hosts,
+    _designated_global_switch, designate_roles,
+)
 
 
 def test_schedule_message_counts_match_paper_example():
@@ -121,6 +124,18 @@ def test_dragonfly_plus_step2_messages_use_global_spines():
             sw1 = designated_switch[(g1, g2)]
             sw2 = designated_switch[(g2, g1)]
             assert (sw1, sw2) in real_links, f"{sw1}<->{sw2} is not a direct global link"
+
+
+def test_dragonfly_plus_spreads_designated_roles_across_leaves():
+    # A group with more remote groups than leaves must still spread its
+    # designated roles across distinct leaf hosts instead of piling every
+    # remote group's global exchange onto a single host (that would recreate
+    # the single-host bottleneck g-PAARD's per-pair designation is meant to
+    # avoid).
+    topo = DragonflyPlusTopo(num_groups=3, leaves_per_group=2, spines_per_group=2, hosts_per_leaf=1)
+    roles = designate_roles(topo)
+    hosts_for_group_0 = {roles[(0, 1)], roles[(0, 2)]}
+    assert len(hosts_for_group_0) == 2, "group 0's two remote pairs should use distinct leaf hosts"
 
 
 def test_raises_when_a_group_has_no_hosts():

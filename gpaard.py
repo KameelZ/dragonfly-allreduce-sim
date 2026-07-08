@@ -50,10 +50,13 @@ After step 6 every host holds every shard: the complete all-reduced result.
 Scope: this module assumes canonical Dragonfly's all-to-all intra-group
 mesh (steps 1/3 need only 1 hop between any two hosts' routers in a group).
 Dragonfly+'s leaf-spine fabric needs 2 hops (leaf -> spine -> leaf) for the
-same intra-group exchange, so the schedule stays the same but the role
-selection and cost model need to respect that topology. This module now
-supports both Dragonfly and Dragonfly+ by selecting a host representative per
-group in the Dragonfly+ case and preserving the same 6-step pattern.
+same intra-group exchange, so the schedule stays the same but role selection
+needs to respect that topology: Dragonfly+'s global links attach only to
+spine routers, which carry no hosts of their own, so each group-pair's
+designated host is instead drawn from a per-group pool of one representative
+host per leaf, round-robined across group-pairs. This spreads the global
+exchange across the group's leaves instead of funneling every remote group's
+traffic through a single host.
 """
 
 
@@ -122,22 +125,47 @@ def designate_roles(topo):
 
     designated_switch = _designated_global_switch(topo)
     hosts_by_switch = _hosts_by_switch(topo)
-    hosts_by_group = group_hosts(topo)
+    leaf_reps_by_group = _leaf_representatives_by_group(topo, hosts_by_switch)
     role_host = {}
-    for (g1, g2), sw in designated_switch.items():
+    next_rep_index = {}
+    for (g1, g2), sw in sorted(designated_switch.items()):
         hosts = hosts_by_switch.get(sw, [])
         if hosts:
             role_host[(g1, g2)] = hosts[0]
             continue
 
-        if hasattr(topo, "spine_map"):
-            role_host[(g1, g2)] = hosts_by_group[g1][0]
+        if leaf_reps_by_group is not None:
+            # sw is a spine (carries no hosts): spread this group's
+            # designated roles round-robin across its leaves' representative
+            # hosts instead of piling every remote group onto one host.
+            reps = leaf_reps_by_group[g1]
+            idx = next_rep_index.get(g1, 0)
+            role_host[(g1, g2)] = reps[idx % len(reps)]
+            next_rep_index[g1] = idx + 1
             continue
 
         raise ValueError(
             f"g-PAARD needs at least 1 host on switch {sw} (group {g1}'s designated "
             f"link to group {g2}) to act as its global-node role for that pair")
     return role_host
+
+
+def _leaf_representatives_by_group(topo, hosts_by_switch):
+    """group_id -> sorted list of one representative host per leaf switch in
+    that group, for Dragonfly+'s per-group round-robin fallback in
+    designate_roles(). Returns None for topologies without a spine/leaf split
+    (e.g. canonical DragonflyTopo), where this fallback never applies.
+    """
+    if not hasattr(topo, "spine_map"):
+        return None
+    switch_group = _switch_group_map(topo)
+    reps_by_group = {}
+    for sw, hosts in hosts_by_switch.items():
+        if hosts:
+            reps_by_group.setdefault(switch_group[sw], []).append(hosts[0])
+    for reps in reps_by_group.values():
+        reps.sort()
+    return reps_by_group
 
 
 def build_gpaard_schedule(topo):
