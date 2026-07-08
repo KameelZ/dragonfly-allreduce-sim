@@ -6,9 +6,8 @@ Pytest suite for gpaard.py -- verifies the g-PAARD all-reduce schedule is
 structurally correct (intra-group steps stay intra-group, inter-group steps
 ride a real global link) and functionally correct (every host ends up with
 every other host's contribution after the full 6-step schedule), across
-several DragonflyTopo configurations. Also checks the documented scope
-boundary (DragonflyPlusTopo isn't supported yet) and a couple of guard rails
-(topologies g-PAARD can't run on at all).
+several DragonflyTopo configurations. Also checks the Dragonfly+ adaptation
+and a couple of guard rails (topologies g-PAARD can't run on at all).
 
     pytest test_gpaard.py
 """
@@ -17,7 +16,7 @@ import pytest
 
 from dragonfly_topo import DragonflyTopo
 from dragonfly_plus_topo import DragonflyPlusTopo
-from gpaard import build_gpaard_schedule, simulate_allreduce, group_hosts, _switch_group_map
+from gpaard import build_gpaard_schedule, simulate_allreduce, group_hosts, _designated_global_switch
 
 
 def test_schedule_message_counts_match_paper_example():
@@ -99,10 +98,29 @@ def test_step2_messages_cross_a_real_global_link():
             assert (sw1, sw2) in real_links, f"{sw1}<->{sw2} is not a direct link"
 
 
-def test_dragonfly_plus_not_yet_supported():
+def test_dragonfly_plus_allreduce_correctness():
     topo = DragonflyPlusTopo(num_groups=2, leaves_per_group=2, spines_per_group=2, hosts_per_leaf=1)
-    with pytest.raises(NotImplementedError):
-        build_gpaard_schedule(topo)
+    schedule = build_gpaard_schedule(topo)
+    step1, step2, step3 = schedule["reduce_scatter"]
+
+    assert len(step2) == 2  # one group pair, two directions
+    assert len(step1) == 2  # one sender per group, one remote destination
+    assert len(step3) == 4  # one local exchange in each direction per group
+
+    simulate_allreduce(topo)
+
+
+def test_dragonfly_plus_step2_messages_use_global_spines():
+    topo = DragonflyPlusTopo(num_groups=3, leaves_per_group=2, spines_per_group=2, hosts_per_leaf=1)
+    designated_switch = _designated_global_switch(topo)
+    real_links = set(topo.links()) | {(b, a) for a, b in topo.links()}
+
+    # Every pair of groups should map to directly connected spine routers.
+    for g1 in range(topo.num_groups):
+        for g2 in range(g1 + 1, topo.num_groups):
+            sw1 = designated_switch[(g1, g2)]
+            sw2 = designated_switch[(g2, g1)]
+            assert (sw1, sw2) in real_links, f"{sw1}<->{sw2} is not a direct global link"
 
 
 def test_raises_when_a_group_has_no_hosts():

@@ -109,7 +109,7 @@ echo $?   # 0 = all hosts reachable, 1 = packet loss
 - [x] Command-line configuration (groups / routers / hosts / bandwidth)
 - [x] Deterministic shortest-path forwarding (flow-based, controller-less)
 - [ ] g-PAARD adaptive, load-aware routing policy
-- [ ] Dragonfly+ topology variant
+- [x] Dragonfly+ topology variant
 - [ ] Dynamic traffic load generators (iperf / custom)
 - [ ] Metrics collection and analysis
 

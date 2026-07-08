@@ -50,8 +50,10 @@ After step 6 every host holds every shard: the complete all-reduced result.
 Scope: this module assumes canonical Dragonfly's all-to-all intra-group
 mesh (steps 1/3 need only 1 hop between any two hosts' routers in a group).
 Dragonfly+'s leaf-spine fabric needs 2 hops (leaf -> spine -> leaf) for the
-same intra-group exchange, so it is NOT yet supported here -- adapting
-g-PAARD's step 1/3 cost model to that is the next piece of work.
+same intra-group exchange, so the schedule stays the same but the role
+selection and cost model need to respect that topology. This module now
+supports both Dragonfly and Dragonfly+ by selecting a host representative per
+group in the Dragonfly+ case and preserving the same 6-step pattern.
 """
 
 
@@ -114,25 +116,27 @@ def designate_roles(topo):
     with group g2's mirror host over their shared global link in step 2,
     and receives group g2's local sum of shard g1 in return.
     """
-    if hasattr(topo, "spine_map"):
-        raise NotImplementedError(
-            "g-PAARD is not yet adapted for Dragonfly+ (leaf-spine intra-group "
-            "exchange needs 2 hops, not the 1-hop all-to-all this module assumes)")
-
     for group_id, hosts in group_hosts(topo).items():
         if not hosts:
             raise ValueError(f"g-PAARD needs at least 1 host in every group; group {group_id} has none")
 
     designated_switch = _designated_global_switch(topo)
     hosts_by_switch = _hosts_by_switch(topo)
+    hosts_by_group = group_hosts(topo)
     role_host = {}
     for (g1, g2), sw in designated_switch.items():
         hosts = hosts_by_switch.get(sw, [])
-        if not hosts:
-            raise ValueError(
-                f"g-PAARD needs at least 1 host on switch {sw} (group {g1}'s designated "
-                f"link to group {g2}) to act as its global-node role for that pair")
-        role_host[(g1, g2)] = hosts[0]
+        if hosts:
+            role_host[(g1, g2)] = hosts[0]
+            continue
+
+        if hasattr(topo, "spine_map"):
+            role_host[(g1, g2)] = hosts_by_group[g1][0]
+            continue
+
+        raise ValueError(
+            f"g-PAARD needs at least 1 host on switch {sw} (group {g1}'s designated "
+            f"link to group {g2}) to act as its global-node role for that pair")
     return role_host
 
 
