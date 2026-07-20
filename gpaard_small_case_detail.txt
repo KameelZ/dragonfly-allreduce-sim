@@ -1,0 +1,284 @@
+Full step-by-step message detail (small cases)
+==================================================================================
+Every message g-PAARD sends in every one of its 6 steps, for a handful of deliberately small topologies -- kept small so nothing is elided.
+
+=== tiny DF (DragonflyTopo) ===
+Dragonfly -- groups=2, routers/group=[2, 2], hosts/router=[1, 1], global=1
+hosts (4): h0_0_0, h0_1_0, h1_0_0, h1_1_0
+
+-- Step 1 - reduce-scatter: intra-group collect (each host sends its native shard-j fragment to its group's collector for group j) --
+  h0_1_0 -> h0_0_0   shard=1   [OK]
+  h1_1_0 -> h1_0_0   shard=0   [OK]
+  (2 messages)
+
+-- Step 2 - reduce-scatter: inter-group exchange over the real global link --
+  h0_0_0 -> h1_0_0   shard=1   [OK]
+  h1_0_0 -> h0_0_0   shard=0   [OK]
+  (2 messages)
+
+-- Step 3 - reduce-scatter: intra-group any-to-all (finishes reducing this group's own shard) --
+  h0_0_0 -> h0_1_0   shard=0   [OK]
+  h0_1_0 -> h0_0_0   shard=0   [OK]
+  h1_0_0 -> h1_1_0   shard=1   [OK]
+  h1_1_0 -> h1_0_0   shard=1   [OK]
+  (4 messages)
+
+-- Step 4 - all-gather: intra-group any-to-all (mirrors step 3) --
+  h0_1_0 -> h0_0_0   shard=0   [OK]
+  h0_0_0 -> h0_1_0   shard=0   [OK]
+  h1_1_0 -> h1_0_0   shard=1   [OK]
+  h1_0_0 -> h1_1_0   shard=1   [OK]
+  (4 messages)
+
+-- Step 5 - all-gather: inter-group exchange (mirrors step 2) --
+  h1_0_0 -> h0_0_0   shard=1   [OK]
+  h0_0_0 -> h1_0_0   shard=0   [OK]
+  (2 messages)
+
+-- Step 6 - all-gather: intra-group broadcast (mirrors step 1) --
+  h0_0_0 -> h0_1_0   shard=1   [OK]
+  h1_0_0 -> h1_1_0   shard=0   [OK]
+  (2 messages)
+
+FUNCTIONAL CHECK: PASS -- all 16 messages together correctly deliver every host's contribution to every host, for every shard.
+
+=== 3-group DF (DragonflyTopo) ===
+Dragonfly -- groups=3, routers/group=[2, 2, 2], hosts/router=[1, 1, 1], global=1
+hosts (6): h0_0_0, h0_1_0, h1_0_0, h1_1_0, h2_0_0, h2_1_0
+
+-- Step 1 - reduce-scatter: intra-group collect (each host sends its native shard-j fragment to its group's collector for group j) --
+  h0_1_0 -> h0_0_0   shard=1   [OK]
+  h0_0_0 -> h0_1_0   shard=2   [OK]
+  h1_1_0 -> h1_0_0   shard=0   [OK]
+  h1_0_0 -> h1_1_0   shard=2   [OK]
+  h2_1_0 -> h2_0_0   shard=0   [OK]
+  h2_0_0 -> h2_1_0   shard=1   [OK]
+  (6 messages)
+
+-- Step 2 - reduce-scatter: inter-group exchange over the real global link --
+  h0_0_0 -> h1_0_0   shard=1   [OK]
+  h1_0_0 -> h0_0_0   shard=0   [OK]
+  h0_1_0 -> h2_0_0   shard=2   [OK]
+  h2_0_0 -> h0_1_0   shard=0   [OK]
+  h1_1_0 -> h2_1_0   shard=2   [OK]
+  h2_1_0 -> h1_1_0   shard=1   [OK]
+  (6 messages)
+
+-- Step 3 - reduce-scatter: intra-group any-to-all (finishes reducing this group's own shard) --
+  h0_0_0 -> h0_1_0   shard=0   [OK]
+  h0_1_0 -> h0_0_0   shard=0   [OK]
+  h1_0_0 -> h1_1_0   shard=1   [OK]
+  h1_1_0 -> h1_0_0   shard=1   [OK]
+  h2_0_0 -> h2_1_0   shard=2   [OK]
+  h2_1_0 -> h2_0_0   shard=2   [OK]
+  (6 messages)
+
+-- Step 4 - all-gather: intra-group any-to-all (mirrors step 3) --
+  h0_1_0 -> h0_0_0   shard=0   [OK]
+  h0_0_0 -> h0_1_0   shard=0   [OK]
+  h1_1_0 -> h1_0_0   shard=1   [OK]
+  h1_0_0 -> h1_1_0   shard=1   [OK]
+  h2_1_0 -> h2_0_0   shard=2   [OK]
+  h2_0_0 -> h2_1_0   shard=2   [OK]
+  (6 messages)
+
+-- Step 5 - all-gather: inter-group exchange (mirrors step 2) --
+  h1_0_0 -> h0_0_0   shard=1   [OK]
+  h0_0_0 -> h1_0_0   shard=0   [OK]
+  h2_0_0 -> h0_1_0   shard=2   [OK]
+  h0_1_0 -> h2_0_0   shard=0   [OK]
+  h2_1_0 -> h1_1_0   shard=2   [OK]
+  h1_1_0 -> h2_1_0   shard=1   [OK]
+  (6 messages)
+
+-- Step 6 - all-gather: intra-group broadcast (mirrors step 1) --
+  h0_0_0 -> h0_1_0   shard=1   [OK]
+  h0_1_0 -> h0_0_0   shard=2   [OK]
+  h1_0_0 -> h1_1_0   shard=0   [OK]
+  h1_1_0 -> h1_0_0   shard=2   [OK]
+  h2_0_0 -> h2_1_0   shard=0   [OK]
+  h2_1_0 -> h2_0_0   shard=1   [OK]
+  (6 messages)
+
+FUNCTIONAL CHECK: PASS -- all 36 messages together correctly deliver every host's contribution to every host, for every shard.
+
+=== single-group DF (DragonflyTopo) ===
+Dragonfly -- groups=1, routers/group=[3], hosts/router=[1], global=1
+hosts (3): h0_0_0, h0_1_0, h0_2_0
+
+-- Step 1 - reduce-scatter: intra-group collect (each host sends its native shard-j fragment to its group's collector for group j) --
+  (no messages)
+  (0 messages)
+
+-- Step 2 - reduce-scatter: inter-group exchange over the real global link --
+  (no messages)
+  (0 messages)
+
+-- Step 3 - reduce-scatter: intra-group any-to-all (finishes reducing this group's own shard) --
+  h0_0_0 -> h0_1_0   shard=0   [OK]
+  h0_0_0 -> h0_2_0   shard=0   [OK]
+  h0_1_0 -> h0_0_0   shard=0   [OK]
+  h0_1_0 -> h0_2_0   shard=0   [OK]
+  h0_2_0 -> h0_0_0   shard=0   [OK]
+  h0_2_0 -> h0_1_0   shard=0   [OK]
+  (6 messages)
+
+-- Step 4 - all-gather: intra-group any-to-all (mirrors step 3) --
+  h0_1_0 -> h0_0_0   shard=0   [OK]
+  h0_2_0 -> h0_0_0   shard=0   [OK]
+  h0_0_0 -> h0_1_0   shard=0   [OK]
+  h0_2_0 -> h0_1_0   shard=0   [OK]
+  h0_0_0 -> h0_2_0   shard=0   [OK]
+  h0_1_0 -> h0_2_0   shard=0   [OK]
+  (6 messages)
+
+-- Step 5 - all-gather: inter-group exchange (mirrors step 2) --
+  (no messages)
+  (0 messages)
+
+-- Step 6 - all-gather: intra-group broadcast (mirrors step 1) --
+  (no messages)
+  (0 messages)
+
+FUNCTIONAL CHECK: PASS -- all 12 messages together correctly deliver every host's contribution to every host, for every shard.
+
+=== tiny DF+ (DragonflyPlusTopo) ===
+Dragonfly+ -- groups=2, leaves/group=[2, 2], spines/group=[2, 2], hosts/leaf=[1, 1], global=1
+hosts (4): h0_0_0, h0_1_0, h1_0_0, h1_1_0
+
+-- Step 1 - reduce-scatter: intra-group collect (each host sends its native shard-j fragment to its group's collector for group j) --
+  h0_1_0 -> h0_0_0   shard=1   [OK]
+  h1_1_0 -> h1_0_0   shard=0   [OK]
+  (2 messages)
+
+-- Step 2 - reduce-scatter: inter-group exchange over the real global link --
+  h0_0_0 -> h1_0_0   shard=1   [OK]
+  h1_0_0 -> h0_0_0   shard=0   [OK]
+  (2 messages)
+
+-- Step 3 - reduce-scatter: intra-group any-to-all (finishes reducing this group's own shard) --
+  h0_0_0 -> h0_1_0   shard=0   [OK]
+  h0_1_0 -> h0_0_0   shard=0   [OK]
+  h1_0_0 -> h1_1_0   shard=1   [OK]
+  h1_1_0 -> h1_0_0   shard=1   [OK]
+  (4 messages)
+
+-- Step 4 - all-gather: intra-group any-to-all (mirrors step 3) --
+  h0_1_0 -> h0_0_0   shard=0   [OK]
+  h0_0_0 -> h0_1_0   shard=0   [OK]
+  h1_1_0 -> h1_0_0   shard=1   [OK]
+  h1_0_0 -> h1_1_0   shard=1   [OK]
+  (4 messages)
+
+-- Step 5 - all-gather: inter-group exchange (mirrors step 2) --
+  h1_0_0 -> h0_0_0   shard=1   [OK]
+  h0_0_0 -> h1_0_0   shard=0   [OK]
+  (2 messages)
+
+-- Step 6 - all-gather: intra-group broadcast (mirrors step 1) --
+  h0_0_0 -> h0_1_0   shard=1   [OK]
+  h1_0_0 -> h1_1_0   shard=0   [OK]
+  (2 messages)
+
+FUNCTIONAL CHECK: PASS -- all 16 messages together correctly deliver every host's contribution to every host, for every shard.
+
+=== 3-group DF+ (DragonflyPlusTopo) ===
+Dragonfly+ -- groups=3, leaves/group=[2, 2, 2], spines/group=[2, 2, 2], hosts/leaf=[1, 1, 1], global=1
+hosts (6): h0_0_0, h0_1_0, h1_0_0, h1_1_0, h2_0_0, h2_1_0
+
+-- Step 1 - reduce-scatter: intra-group collect (each host sends its native shard-j fragment to its group's collector for group j) --
+  h0_1_0 -> h0_0_0   shard=1   [OK]
+  h0_0_0 -> h0_1_0   shard=2   [OK]
+  h1_1_0 -> h1_0_0   shard=0   [OK]
+  h1_0_0 -> h1_1_0   shard=2   [OK]
+  h2_1_0 -> h2_0_0   shard=0   [OK]
+  h2_0_0 -> h2_1_0   shard=1   [OK]
+  (6 messages)
+
+-- Step 2 - reduce-scatter: inter-group exchange over the real global link --
+  h0_0_0 -> h1_0_0   shard=1   [OK]
+  h1_0_0 -> h0_0_0   shard=0   [OK]
+  h0_1_0 -> h2_0_0   shard=2   [OK]
+  h2_0_0 -> h0_1_0   shard=0   [OK]
+  h1_1_0 -> h2_1_0   shard=2   [OK]
+  h2_1_0 -> h1_1_0   shard=1   [OK]
+  (6 messages)
+
+-- Step 3 - reduce-scatter: intra-group any-to-all (finishes reducing this group's own shard) --
+  h0_0_0 -> h0_1_0   shard=0   [OK]
+  h0_1_0 -> h0_0_0   shard=0   [OK]
+  h1_0_0 -> h1_1_0   shard=1   [OK]
+  h1_1_0 -> h1_0_0   shard=1   [OK]
+  h2_0_0 -> h2_1_0   shard=2   [OK]
+  h2_1_0 -> h2_0_0   shard=2   [OK]
+  (6 messages)
+
+-- Step 4 - all-gather: intra-group any-to-all (mirrors step 3) --
+  h0_1_0 -> h0_0_0   shard=0   [OK]
+  h0_0_0 -> h0_1_0   shard=0   [OK]
+  h1_1_0 -> h1_0_0   shard=1   [OK]
+  h1_0_0 -> h1_1_0   shard=1   [OK]
+  h2_1_0 -> h2_0_0   shard=2   [OK]
+  h2_0_0 -> h2_1_0   shard=2   [OK]
+  (6 messages)
+
+-- Step 5 - all-gather: inter-group exchange (mirrors step 2) --
+  h1_0_0 -> h0_0_0   shard=1   [OK]
+  h0_0_0 -> h1_0_0   shard=0   [OK]
+  h2_0_0 -> h0_1_0   shard=2   [OK]
+  h0_1_0 -> h2_0_0   shard=0   [OK]
+  h2_1_0 -> h1_1_0   shard=2   [OK]
+  h1_1_0 -> h2_1_0   shard=1   [OK]
+  (6 messages)
+
+-- Step 6 - all-gather: intra-group broadcast (mirrors step 1) --
+  h0_0_0 -> h0_1_0   shard=1   [OK]
+  h0_1_0 -> h0_0_0   shard=2   [OK]
+  h1_0_0 -> h1_1_0   shard=0   [OK]
+  h1_1_0 -> h1_0_0   shard=2   [OK]
+  h2_0_0 -> h2_1_0   shard=0   [OK]
+  h2_1_0 -> h2_0_0   shard=1   [OK]
+  (6 messages)
+
+FUNCTIONAL CHECK: PASS -- all 36 messages together correctly deliver every host's contribution to every host, for every shard.
+
+=== single-group DF+ (DragonflyPlusTopo) ===
+Dragonfly+ -- groups=1, leaves/group=[3], spines/group=[2], hosts/leaf=[1], global=1
+hosts (3): h0_0_0, h0_1_0, h0_2_0
+
+-- Step 1 - reduce-scatter: intra-group collect (each host sends its native shard-j fragment to its group's collector for group j) --
+  (no messages)
+  (0 messages)
+
+-- Step 2 - reduce-scatter: inter-group exchange over the real global link --
+  (no messages)
+  (0 messages)
+
+-- Step 3 - reduce-scatter: intra-group any-to-all (finishes reducing this group's own shard) --
+  h0_0_0 -> h0_1_0   shard=0   [OK]
+  h0_0_0 -> h0_2_0   shard=0   [OK]
+  h0_1_0 -> h0_0_0   shard=0   [OK]
+  h0_1_0 -> h0_2_0   shard=0   [OK]
+  h0_2_0 -> h0_0_0   shard=0   [OK]
+  h0_2_0 -> h0_1_0   shard=0   [OK]
+  (6 messages)
+
+-- Step 4 - all-gather: intra-group any-to-all (mirrors step 3) --
+  h0_1_0 -> h0_0_0   shard=0   [OK]
+  h0_2_0 -> h0_0_0   shard=0   [OK]
+  h0_0_0 -> h0_1_0   shard=0   [OK]
+  h0_2_0 -> h0_1_0   shard=0   [OK]
+  h0_0_0 -> h0_2_0   shard=0   [OK]
+  h0_1_0 -> h0_2_0   shard=0   [OK]
+  (6 messages)
+
+-- Step 5 - all-gather: inter-group exchange (mirrors step 2) --
+  (no messages)
+  (0 messages)
+
+-- Step 6 - all-gather: intra-group broadcast (mirrors step 1) --
+  (no messages)
+  (0 messages)
+
+FUNCTIONAL CHECK: PASS -- all 12 messages together correctly deliver every host's contribution to every host, for every shard.
+

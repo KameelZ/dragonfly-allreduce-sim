@@ -1,0 +1,65 @@
+g-PAARD correctness verification report
+==================================================================================
+generated: 2026-07-08 19:21:06
+total cases: 54  (curated: 14, randomized: 40)
+checks per case: FUNCTIONAL = simulate_allreduce() (every host ends up with every host's contribution); STRUCTURAL = intra-group steps stay in-group, inter-group step rides a real direct link
+
+case                                           topology           grp  hosts   func  struct  overall
+----------------------------------------------------------------------------------------------------
+tiny symmetric (DF)                            DragonflyTopo        2      4   PASS    PASS     PASS
+medium symmetric (DF)                          DragonflyTopo        4     24   PASS    PASS     PASS
+single group (trivial all-to-all) (DF)         DragonflyTopo        1      8   PASS    PASS     PASS
+asymmetric groups (DF)                         DragonflyTopo        5     24   PASS    PASS     PASS
+multiple global links (DF)                     DragonflyTopo        5     20   PASS    PASS     PASS
+minimal 1 router/group (DF)                    DragonflyTopo        6     12   PASS    PASS     PASS
+large scale (DF)                               DragonflyTopo        8     48   PASS    PASS     PASS
+tiny symmetric (DF+)                           DragonflyPlusTopo    2      4   PASS    PASS     PASS
+medium symmetric (DF+)                         DragonflyPlusTopo    4     24   PASS    PASS     PASS
+single group (trivial all-to-all) (DF+)        DragonflyPlusTopo    1      8   PASS    PASS     PASS
+asymmetric groups (DF+)                        DragonflyPlusTopo    5     24   PASS    PASS     PASS
+multiple global links (DF+)                    DragonflyPlusTopo    5     15   PASS    PASS     PASS
+more remote groups than leaves (role spreading) (DF+) DragonflyPlusTopo    6     12   PASS    PASS     PASS
+large scale (DF+)                              DragonflyPlusTopo    8     48   PASS    PASS     PASS
+random#0 (DF)                                  DragonflyTopo        4     35   PASS    PASS     PASS
+random#1 (DF)                                  DragonflyTopo        2     12   PASS    PASS     PASS
+random#2 (DF)                                  DragonflyTopo        5     26   PASS    PASS     PASS
+random#3 (DF)                                  DragonflyTopo        5     28   PASS    PASS     PASS
+random#4 (DF)                                  DragonflyTopo        4     14   PASS    PASS     PASS
+random#5 (DF+)                                 DragonflyPlusTopo    1      8   PASS    PASS     PASS
+random#6 (DF+)                                 DragonflyPlusTopo    5     16   PASS    PASS     PASS
+random#7 (DF)                                  DragonflyTopo        5     18   PASS    PASS     PASS
+random#8 (DF)                                  DragonflyTopo        6     42   PASS    PASS     PASS
+random#9 (DF)                                  DragonflyTopo        5     16   PASS    PASS     PASS
+random#10 (DF+)                                DragonflyPlusTopo    3     15   PASS    PASS     PASS
+random#11 (DF)                                 DragonflyTopo        1      6   PASS    PASS     PASS
+random#12 (DF)                                 DragonflyTopo        5     11   PASS    PASS     PASS
+random#13 (DF+)                                DragonflyPlusTopo    6     23   PASS    PASS     PASS
+random#14 (DF)                                 DragonflyTopo        6     28   PASS    PASS     PASS
+random#15 (DF)                                 DragonflyTopo        4     29   PASS    PASS     PASS
+random#16 (DF)                                 DragonflyTopo        5     22   PASS    PASS     PASS
+random#17 (DF+)                                DragonflyPlusTopo    6     33   PASS    PASS     PASS
+random#18 (DF)                                 DragonflyTopo        5     24   PASS    PASS     PASS
+random#19 (DF+)                                DragonflyPlusTopo    4     19   PASS    PASS     PASS
+random#20 (DF+)                                DragonflyPlusTopo    6     24   PASS    PASS     PASS
+random#21 (DF+)                                DragonflyPlusTopo    3     14   PASS    PASS     PASS
+random#22 (DF+)                                DragonflyPlusTopo    3     10   PASS    PASS     PASS
+random#23 (DF)                                 DragonflyTopo        3     20   PASS    PASS     PASS
+random#24 (DF)                                 DragonflyTopo        6     28   PASS    PASS     PASS
+random#25 (DF+)                                DragonflyPlusTopo    1      2   PASS    PASS     PASS
+random#26 (DF+)                                DragonflyPlusTopo    2      9   PASS    PASS     PASS
+random#27 (DF+)                                DragonflyPlusTopo    1      1   PASS    PASS     PASS
+random#28 (DF)                                 DragonflyTopo        5     29   PASS    PASS     PASS
+random#29 (DF)                                 DragonflyTopo        3     19   PASS    PASS     PASS
+random#30 (DF+)                                DragonflyPlusTopo    6     30   PASS    PASS     PASS
+random#31 (DF)                                 DragonflyTopo        6     27   PASS    PASS     PASS
+random#32 (DF)                                 DragonflyTopo        4     25   PASS    PASS     PASS
+random#33 (DF)                                 DragonflyTopo        2     15   PASS    PASS     PASS
+random#34 (DF+)                                DragonflyPlusTopo    1      4   PASS    PASS     PASS
+random#35 (DF)                                 DragonflyTopo        6     42   PASS    PASS     PASS
+random#36 (DF)                                 DragonflyTopo        1      9   PASS    PASS     PASS
+random#37 (DF+)                                DragonflyPlusTopo    2      5   PASS    PASS     PASS
+random#38 (DF)                                 DragonflyTopo        2      6   PASS    PASS     PASS
+random#39 (DF)                                 DragonflyTopo        2     21   PASS    PASS     PASS
+
+SUMMARY: 54/54 cases passed
+g-PAARD is verified CORRECT on both DragonflyTopo and DragonflyPlusTopo across every tested configuration.

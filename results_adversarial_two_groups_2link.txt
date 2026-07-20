@@ -1,0 +1,164 @@
+Adversarial shift-pattern benchmark -- config: two_groups_2link
+======================================================================
+generated: 2026-07-20 18:45:17
+groups=2 global_links_per_pair=2 (2 groups, 2 global link(s) per group pair -- shift still forces each group's entire egress onto its one link to the next group, but other groups/links exist elsewhere in the network)
+routers=2 leaves=2 spines=2 hosts=1 bw=10Mbit delay=1ms
+patterns: gpaard, uniform, all_to_all, hotspot, shift, nearest_neighbor
+message sizes: 4K, 64K, 1M
+repeat: 3
+
+----------------------------------------------------------------------
+TOPOLOGY UNDER TEST: dragonfly
+----------------------------------------------------------------------
+Dragonfly -- groups=2, routers/group=[2, 2], hosts/router=[1, 1], global=2
+switches=4 hosts=4 links=8 (host=4, local=2, global=2)
+[full topology plot saved to adversarial_topology_plots/two_groups_2link_dragonfly.png]
+
+----------------------------------------------------------------------
+TOPOLOGY UNDER TEST: dragonfly+
+----------------------------------------------------------------------
+Dragonfly+ -- groups=2, leaves/group=[2, 2], spines/group=[2, 2], hosts/leaf=[1, 1], global=2
+switches=8 hosts=4 links=14 (host=4, local=8, global=2)
+[full topology plot saved to adversarial_topology_plots/two_groups_2link_dragonflyplus.png]
+
+======================================================================
+RESULTS (every iteration, then the average, then speedup from the averages)
+======================================================================
+----------------------------------------------------------------------
+PATTERN: gpaard
+----------------------------------------------------------------------
+  g-PAARD's own 6-step reduce-scatter + all-gather all-reduce schedule. This
+  is the actual workload the routing in this project was built for, so it is
+  the baseline every other pattern is judged against: if Dragonfly+ doesn't
+  win here, the extra spine hardware isn't paying for itself on the workload
+  that matters.
+
+  dragonfly       4K: [iter1=2.145s, iter2=1.149s, iter3=1.149s]  avg=1.481s
+  dragonfly+      4K: [iter1=1.166s, iter2=1.165s, iter3=3.166s]  avg=1.832s
+  speedup (4K, avg dragonfly / avg dragonfly+): 0.808
+
+  dragonfly      64K: [iter1=1.438s, iter2=3.435s, iter3=1.439s]  avg=2.104s
+  dragonfly+     64K: [iter1=2.451s, iter2=2.450s, iter3=1.455s]  avg=2.119s
+  speedup (64K, avg dragonfly / avg dragonfly+): 0.993
+
+  dragonfly       1M: [iter1=6.435s, iter2=7.414s, iter3=6.418s]  avg=6.756s
+  dragonfly+      1M: [iter1=6.628s, iter2=6.660s, iter3=6.659s]  avg=6.649s
+  speedup (1M, avg dragonfly / avg dragonfly+): 1.016
+
+----------------------------------------------------------------------
+PATTERN: uniform
+----------------------------------------------------------------------
+  Every host sends once to a uniformly random other host, all at once. A
+  light, evenly-spread control pattern -- it rarely concentrates load on any
+  single link or endpoint, so it shows roughly how the two topologies perform
+  when nothing adversarial is happening.
+
+  dragonfly       4K: [iter1=0.194s, iter2=0.194s, iter3=0.194s]  avg=0.194s
+  dragonfly+      4K: [iter1=1.192s, iter2=0.196s, iter3=0.196s]  avg=0.528s
+  speedup (4K, avg dragonfly / avg dragonfly+): 0.367
+
+  dragonfly      64K: [iter1=1.288s, iter2=1.288s, iter3=0.290s]  avg=0.956s
+  dragonfly+     64K: [iter1=0.308s, iter2=1.309s, iter3=0.308s]  avg=0.642s
+  speedup (64K, avg dragonfly / avg dragonfly+): 1.488
+
+  dragonfly       1M: [iter1=2.152s, iter2=2.151s, iter3=2.151s]  avg=2.152s
+  dragonfly+      1M: [iter1=1.979s, iter2=2.979s, iter3=1.979s]  avg=2.312s
+  speedup (1M, avg dragonfly / avg dragonfly+): 0.930
+
+----------------------------------------------------------------------
+PATTERN: all_to_all
+----------------------------------------------------------------------
+  Every host sends to every other host, all at once. The heaviest 'fair'
+  pattern: aggregate load is maximal, but because every host talks to every
+  other host it is symmetric across the fabric, so no single link or router is
+  picked out over the others.
+
+  dragonfly       4K: [iter1=0.206s, iter2=1.195s, iter3=1.209s]  avg=0.870s
+  dragonfly+      4K: [iter1=0.217s, iter2=1.211s, iter3=0.216s]  avg=0.548s
+  speedup (4K, avg dragonfly / avg dragonfly+): 1.587
+
+  dragonfly      64K: [iter1=1.335s, iter2=0.380s, iter3=0.376s]  avg=0.697s
+  dragonfly+     64K: [iter1=1.436s, iter2=0.441s, iter3=0.441s]  avg=0.773s
+  speedup (64K, avg dragonfly / avg dragonfly+): 0.902
+
+  dragonfly       1M: [iter1=3.794s, iter2=3.103s, iter3=3.119s]  avg=3.338s
+  dragonfly+      1M: [iter1=3.910s, iter2=3.909s, iter3=3.909s]  avg=3.909s
+  speedup (1M, avg dragonfly / avg dragonfly+): 0.854
+
+----------------------------------------------------------------------
+PATTERN: hotspot
+----------------------------------------------------------------------
+  Every host sends to one randomly chosen target host, all at once (a worst-
+  case incast). This is interesting to test here because it attacks a
+  different weak point than the fabric-side adversarial patterns below: no
+  matter how many parallel global links or spine switches sit upstream giving
+  the network path diversity, the last hop into the target's own router/leaf
+  is single-width, so hotspot exercises the *endpoint* bottleneck rather than
+  the *fabric* bottleneck. It models real collectives that do this on purpose
+  (a reduce-to-one, a parameter-server pull, a straggler retry storm) and
+  shows whether Dragonfly+'s extra global bandwidth helps at all once the
+  constraint has moved off the fabric and onto one machine's NIC.
+
+  dragonfly       4K: [iter1=1.192s, iter2=1.192s, iter3=0.193s]  avg=0.859s
+  dragonfly+      4K: [iter1=0.196s, iter2=1.191s, iter3=0.196s]  avg=0.528s
+  speedup (4K, avg dragonfly / avg dragonfly+): 1.628
+
+  dragonfly      64K: [iter1=0.354s, iter2=0.338s, iter3=0.354s]  avg=0.349s
+  dragonfly+     64K: [iter1=0.356s, iter2=0.357s, iter3=0.356s]  avg=0.356s
+  speedup (64K, avg dragonfly / avg dragonfly+): 0.978
+
+  dragonfly       1M: [iter1=2.811s, iter2=2.812s, iter3=2.812s]  avg=2.812s
+  dragonfly+      1M: [iter1=2.814s, iter2=2.815s, iter3=2.815s]  avg=2.814s
+  speedup (1M, avg dragonfly / avg dragonfly+): 0.999
+
+----------------------------------------------------------------------
+PATTERN: shift
+----------------------------------------------------------------------
+  Adversarial ring-shift traffic (see 'Adversarial traffic' above): every host
+  in group g sends to the matching host in the next group over, so 100% of
+  each group's egress bandwidth is forced onto the single global link
+  connecting the two groups -- simultaneously, on every group-pair edge around
+  the ring. Unlike hotspot, the bottleneck here is squarely on the *fabric*,
+  not any one endpoint: it directly tests whether Dragonfly+'s extra spine-
+  layer paths and leaf/spine link fan-out give it real headroom under a link
+  that is *provably* the only route between two groups, or whether both
+  topologies choke equally once shortest-path routing has no alternative to
+  offer.
+
+  dragonfly       4K: [iter1=0.193s, iter2=1.192s, iter3=0.192s]  avg=0.526s
+  dragonfly+      4K: [iter1=0.197s, iter2=0.196s, iter3=0.196s]  avg=0.196s
+  speedup (4K, avg dragonfly / avg dragonfly+): 2.678
+
+  dragonfly      64K: [iter1=1.240s, iter2=0.240s, iter3=1.240s]  avg=0.907s
+  dragonfly+     64K: [iter1=0.308s, iter2=0.308s, iter3=0.308s]  avg=0.308s
+  speedup (64K, avg dragonfly / avg dragonfly+): 2.941
+
+  dragonfly       1M: [iter1=1.076s, iter2=1.076s, iter3=1.076s]  avg=1.076s
+  dragonfly+      1M: [iter1=1.979s, iter2=1.979s, iter3=1.979s]  avg=1.979s
+  speedup (1M, avg dragonfly / avg dragonfly+): 0.544
+
+----------------------------------------------------------------------
+PATTERN: nearest_neighbor
+----------------------------------------------------------------------
+  Adversarial nearest-neighbor traffic (see 'Adversarial traffic' above):
+  hosts are ordered round-robin across groups and each sends to its immediate
+  successor, so an application pattern that *should* be nearly free (talk only
+  to your neighbor) instead forces almost every message across a global link.
+  This is worth testing because it is a realistic failure mode, not a
+  synthetic worst case -- job placement that ignores the physical topology
+  turns cheap stencil/ring communication into fabric-bound traffic, and this
+  pattern measures exactly how expensive that placement mistake is on each
+  topology.
+
+  dragonfly       4K: [iter1=0.194s, iter2=0.194s, iter3=0.194s]  avg=0.194s
+  dragonfly+      4K: [iter1=0.196s, iter2=0.196s, iter3=1.192s]  avg=0.528s
+  speedup (4K, avg dragonfly / avg dragonfly+): 0.368
+
+  dragonfly      64K: [iter1=0.243s, iter2=1.240s, iter3=0.242s]  avg=0.575s
+  dragonfly+     64K: [iter1=1.309s, iter2=0.309s, iter3=0.309s]  avg=0.642s
+  speedup (64K, avg dragonfly / avg dragonfly+): 0.895
+
+  dragonfly       1M: [iter1=1.238s, iter2=1.238s, iter3=2.234s]  avg=1.570s
+  dragonfly+      1M: [iter1=1.979s, iter2=1.979s, iter3=1.979s]  avg=1.979s
+  speedup (1M, avg dragonfly / avg dragonfly+): 0.793
+

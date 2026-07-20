@@ -1,0 +1,36 @@
+g-PAARD Dragonfly vs Dragonfly+ benchmark results
+======================================================================
+generated: 2026-07-08 18:12:11
+topology params: groups=3 routers=2 leaves=2 spines=2 hosts=1 bw=10Mbit delay=1ms global_links=1
+patterns: gpaard, hotspot
+message sizes: 4K, 1M
+repeat: 1
+
+topology    pattern     msg size  steps   msgs    time(s)     Mbit/s
+--------------------------------------------------------------------
+dragonfly   gpaard            4K      6     36      3.159       0.37
+dragonfly   gpaard            1M      6     36      6.475      46.64
+dragonfly   hotspot           4K      1      5      0.212       0.77
+dragonfly   hotspot           1M      1      5      4.579       9.16
+dragonfly+  gpaard            4K      6     36      4.171       0.28
+dragonfly+  gpaard            1M      6     36      7.862      38.41
+dragonfly+  hotspot           4K      1      5      0.212       0.77
+dragonfly+  hotspot           1M      1      5      4.565       9.19
+
+Dragonfly vs Dragonfly+ speedup (dragonfly time / dragonfly+ time, >1 means Dragonfly+ faster)
+----------------------------------------------------------------------
+gpaard            4K  speedup=0.757
+gpaard            1M  speedup=0.824
+hotspot           4K  speedup=0.999
+hotspot           1M  speedup=1.003
+
+Per-step timings
+----------------------------------------------------------------------
+dragonfly   gpaard            4K: [0.193, 1.193, 0.193, 0.193, 0.193, 1.193]
+dragonfly   gpaard            1M: [1.076, 1.076, 1.077, 1.093, 1.076, 1.076]
+dragonfly   hotspot           4K: [0.212]
+dragonfly   hotspot           1M: [4.579]
+dragonfly+  gpaard            4K: [0.195, 1.193, 0.195, 1.195, 0.197, 1.195]
+dragonfly+  gpaard            1M: [2.159, 1.113, 1.159, 1.159, 1.113, 1.159]
+dragonfly+  hotspot           4K: [0.212]
+dragonfly+  hotspot           1M: [4.565]
