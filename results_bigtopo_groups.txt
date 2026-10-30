@@ -1,0 +1,53 @@
+g-PAARD single-axis sweep -- varying: groups
+======================================================================
+generated: 2026-10-04 20:29:53
+swept axis: groups = [4]
+  (number of Dragonfly groups (DF and DF+ are identical for <=3 groups; they diverge in the global-exchange steps from 4 groups on))
+fixed BIG base topology (everything except the swept axis):
+  groups=(swept) width=6 hosts/switch=4 bw=10Mbit delay=1ms global_links=1
+pattern: gpaard (only)
+message sizes: 64K, 1M
+repeat: 5
+
+----------------------------------------------------------------------
+TOPOLOGY UNDER TEST: dragonfly   [groups_4_dragonfly]
+----------------------------------------------------------------------
+Dragonfly -- groups=4, routers/group=[6, 6, 6, 6], hosts/router=[4, 4, 4, 4], global=1
+switches=24 hosts=96 links=162 (host=96, local=60, global=6)
+[full topology plot saved to big_topology_plots/groups_4_dragonfly.png]
+
+----------------------------------------------------------------------
+TOPOLOGY UNDER TEST: dragonfly+   [groups_4_dragonflyplus]
+----------------------------------------------------------------------
+Dragonfly+ -- groups=4, leaves/group=[6, 6, 6, 6], spines/group=[6, 6, 6, 6], hosts/leaf=[4, 4, 4, 4], global=1
+switches=48 hosts=96 links=246 (host=96, local=144, global=6)
+[full topology plot saved to big_topology_plots/groups_4_dragonflyplus.png]
+
+======================================================================
+RESULTS: g-PAARD, grouped by groups then message size
+(every iteration, then the average, then speedup from the averages)
+======================================================================
+  g-PAARD's own 6-step reduce-scatter + all-gather all-reduce schedule. This
+  is the actual workload the routing in this project was built for, so it is
+  the baseline every other pattern is judged against: if Dragonfly+ doesn't
+  win here, the extra spine hardware isn't paying for itself on the workload
+  that matters.
+
+----------------------------------------------------------------------
+groups = 4
+----------------------------------------------------------------------
+  dragonfly      64K: [iter1=86.899s, iter2=90.223s, iter3=91.318s, iter4=89.730s, iter5=91.505s]  avg=89.935s
+  dragonfly+     64K: [iter1=95.814s, iter2=91.887s, iter3=96.474s, iter4=94.046s, iter5=95.977s]  avg=94.839s
+  speedup (64K, groups=4, avg dragonfly / avg dragonfly+): 0.948
+
+  dragonfly       1M: [iter1=176.134s, iter2=178.826s, iter3=175.769s, iter4=179.317s, iter5=177.538s]  avg=177.517s
+  dragonfly+      1M: [iter1=350.253s, iter2=304.083s, iter3=330.774s, iter4=339.380s, iter5=352.219s]  avg=335.342s
+  speedup (1M, groups=4, avg dragonfly / avg dragonfly+): 0.529
+
+======================================================================
+SPEEDUP MATRIX (avg dragonfly / avg dragonfly+)  [>1 = DF+ faster]
+rows = groups, columns = message size
+======================================================================
+      groups         64K        1M
+           4       0.948     0.529
+

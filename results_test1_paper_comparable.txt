@@ -1,0 +1,244 @@
+Section 1: paper-comparable sweep (DF(2,4,2)-equivalent topology)
+======================================================================
+generated: 2026-10-10 17:29:29
+groups=4 width=4 hosts/router=2 (8 hosts/group, 32 nodes total -- matches Ma et al.'s DF(2,4,2)) bw=100Mbit (this project's own choice; the paper works in flits/cycles, not Mbit/s) delay=1ms global_links=1
+message sizes: 1K, 4K, 16K, 64K, 256K, 1M (mirrors the paper's ~1KB-1MB sweep)
+patterns: gpaard, gpaard_hierarchical  repeat: 40
+
+g-PAARD's own 6-step reduce-scatter + all-gather all-reduce schedule. This is the actual workload the routing in this project was built for, so it is the baseline every other pattern is judged against: if Dragonfly+ doesn't win here, the extra spine hardware isn't paying for itself on the workload that matters.
+
+Optimization idea #2: g-PAARD with steps 3/4's flat O(hosts^2) intra-group any-to-all replaced by a 2-level hierarchy -- combine within each leaf/router first (cheap, same cost in DF and DF+), then exchange among one representative per leaf only (the only part that crosses DF+'s expensive leaf-spine hop, now O(leaves^2) instead of O(hosts^2)), then broadcast back. test_7's spine-oversubscription triage showed hardware alone can't fix the gap (no ECMP in this project's routing); this targets the same contention by cutting message volume instead.
+
+----------------------------------------------------------------------
+TOPOLOGY UNDER TEST: dragonfly   [paper_comparable_dragonfly_size1K]
+----------------------------------------------------------------------
+Dragonfly -- groups=4, routers/group=[4, 4, 4, 4], hosts/router=[2, 2, 2, 2], global=1
+switches=16 hosts=32 links=62 (host=32, local=24, global=6)
+[full topology plot saved to paper_comparable_topology_plots/paper_comparable_dragonfly_size1K.png]
+
+----------------------------------------------------------------------
+TOPOLOGY UNDER TEST: dragonfly+   [paper_comparable_dragonflyplus_size1K]
+----------------------------------------------------------------------
+Dragonfly+ -- groups=4, leaves/group=[4, 4, 4, 4], spines/group=[4, 4, 4, 4], hosts/leaf=[2, 2, 2, 2], global=1
+switches=32 hosts=32 links=102 (host=32, local=64, global=6)
+[full topology plot saved to paper_comparable_topology_plots/paper_comparable_dragonflyplus_size1K.png]
+
+----------------------------------------------------------------------
+TOPOLOGY UNDER TEST: dragonfly+   [paper_comparable_dragonflyplus_size4K]
+----------------------------------------------------------------------
+Dragonfly+ -- groups=4, leaves/group=[4, 4, 4, 4], spines/group=[4, 4, 4, 4], hosts/leaf=[2, 2, 2, 2], global=1
+switches=32 hosts=32 links=102 (host=32, local=64, global=6)
+[full topology plot saved to paper_comparable_topology_plots/paper_comparable_dragonflyplus_size4K.png]
+
+----------------------------------------------------------------------
+TOPOLOGY UNDER TEST: dragonfly   [paper_comparable_dragonfly_size4K]
+----------------------------------------------------------------------
+Dragonfly -- groups=4, routers/group=[4, 4, 4, 4], hosts/router=[2, 2, 2, 2], global=1
+switches=16 hosts=32 links=62 (host=32, local=24, global=6)
+[full topology plot saved to paper_comparable_topology_plots/paper_comparable_dragonfly_size4K.png]
+
+----------------------------------------------------------------------
+TOPOLOGY UNDER TEST: dragonfly   [paper_comparable_dragonfly_size16K]
+----------------------------------------------------------------------
+Dragonfly -- groups=4, routers/group=[4, 4, 4, 4], hosts/router=[2, 2, 2, 2], global=1
+switches=16 hosts=32 links=62 (host=32, local=24, global=6)
+[full topology plot saved to paper_comparable_topology_plots/paper_comparable_dragonfly_size16K.png]
+
+----------------------------------------------------------------------
+TOPOLOGY UNDER TEST: dragonfly+   [paper_comparable_dragonflyplus_size16K]
+----------------------------------------------------------------------
+Dragonfly+ -- groups=4, leaves/group=[4, 4, 4, 4], spines/group=[4, 4, 4, 4], hosts/leaf=[2, 2, 2, 2], global=1
+switches=32 hosts=32 links=102 (host=32, local=64, global=6)
+[full topology plot saved to paper_comparable_topology_plots/paper_comparable_dragonflyplus_size16K.png]
+
+----------------------------------------------------------------------
+TOPOLOGY UNDER TEST: dragonfly+   [paper_comparable_dragonflyplus_size64K]
+----------------------------------------------------------------------
+Dragonfly+ -- groups=4, leaves/group=[4, 4, 4, 4], spines/group=[4, 4, 4, 4], hosts/leaf=[2, 2, 2, 2], global=1
+switches=32 hosts=32 links=102 (host=32, local=64, global=6)
+[full topology plot saved to paper_comparable_topology_plots/paper_comparable_dragonflyplus_size64K.png]
+
+----------------------------------------------------------------------
+TOPOLOGY UNDER TEST: dragonfly   [paper_comparable_dragonfly_size64K]
+----------------------------------------------------------------------
+Dragonfly -- groups=4, routers/group=[4, 4, 4, 4], hosts/router=[2, 2, 2, 2], global=1
+switches=16 hosts=32 links=62 (host=32, local=24, global=6)
+[full topology plot saved to paper_comparable_topology_plots/paper_comparable_dragonfly_size64K.png]
+
+----------------------------------------------------------------------
+TOPOLOGY UNDER TEST: dragonfly   [paper_comparable_dragonfly_size256K]
+----------------------------------------------------------------------
+Dragonfly -- groups=4, routers/group=[4, 4, 4, 4], hosts/router=[2, 2, 2, 2], global=1
+switches=16 hosts=32 links=62 (host=32, local=24, global=6)
+[full topology plot saved to paper_comparable_topology_plots/paper_comparable_dragonfly_size256K.png]
+
+----------------------------------------------------------------------
+TOPOLOGY UNDER TEST: dragonfly+   [paper_comparable_dragonflyplus_size256K]
+----------------------------------------------------------------------
+Dragonfly+ -- groups=4, leaves/group=[4, 4, 4, 4], spines/group=[4, 4, 4, 4], hosts/leaf=[2, 2, 2, 2], global=1
+switches=32 hosts=32 links=102 (host=32, local=64, global=6)
+[full topology plot saved to paper_comparable_topology_plots/paper_comparable_dragonflyplus_size256K.png]
+
+----------------------------------------------------------------------
+TOPOLOGY UNDER TEST: dragonfly+   [paper_comparable_dragonflyplus_size1M]
+----------------------------------------------------------------------
+Dragonfly+ -- groups=4, leaves/group=[4, 4, 4, 4], spines/group=[4, 4, 4, 4], hosts/leaf=[2, 2, 2, 2], global=1
+switches=32 hosts=32 links=102 (host=32, local=64, global=6)
+[full topology plot saved to paper_comparable_topology_plots/paper_comparable_dragonflyplus_size1M.png]
+
+----------------------------------------------------------------------
+TOPOLOGY UNDER TEST: dragonfly   [paper_comparable_dragonfly_size1M]
+----------------------------------------------------------------------
+Dragonfly -- groups=4, routers/group=[4, 4, 4, 4], hosts/router=[2, 2, 2, 2], global=1
+switches=16 hosts=32 links=62 (host=32, local=24, global=6)
+[full topology plot saved to paper_comparable_topology_plots/paper_comparable_dragonfly_size1M.png]
+
+======================================================================
+RESULTS: mean [95% CI], n=40
+intra-group time (steps 1,3,4,6) is where DF vs DF+ CAN structurally differ; inter-group time (steps 2,5) is identical by construction and shown only as a sanity check. FCT = per-flow (per-message) completion time distribution across the whole pattern.
+======================================================================
+----------------------------------------------------------------------
+size=1K
+----------------------------------------------------------------------
+  dragonfly   gpaard              total=      8.119s +/- 0.212  intra=      6.054s +/- 0.172  inter=      2.065s +/- 0.162
+                                  FCT: mean=0.2686s p50=0.1580s p95=1.0411s max=2.0392s (n=25600 messages)
+                                  global_0_1    achieved=0.008Mbit/s +/- 0.000
+                                  local_group0  achieved=0.049Mbit/s +/- 0.001
+  dragonfly+  gpaard              total=      8.153s +/- 0.227  intra=      5.979s +/- 0.155  inter=      2.174s +/- 0.164
+                                  FCT: mean=0.2756s p50=0.1632s p95=1.0432s max=2.0407s (n=25600 messages)
+                                  global_0_1    achieved=0.008Mbit/s +/- 0.000
+                                  local_group0  achieved=0.146Mbit/s +/- 0.002
+  dragonfly   gpaard_hierarchical total=     12.159s +/- 0.203
+                                  FCT: mean=0.1914s p50=0.0409s p95=1.0369s max=2.0374s (n=15360 messages)
+                                  global_0_1    achieved=0.005Mbit/s +/- 0.000
+                                  local_group0  achieved=0.015Mbit/s +/- 0.000
+  dragonfly+  gpaard_hierarchical total=     12.102s +/- 0.234
+                                  FCT: mean=0.1924s p50=0.0431s p95=1.0390s max=2.0398s (n=15360 messages)
+                                  global_0_1    achieved=0.005Mbit/s +/- 0.000
+                                  local_group0  achieved=0.046Mbit/s +/- 0.000
+  GAP flat  (dragonfly/dragonfly+, gpaard):              0.996  significant=False
+  GAP hier  (dragonfly/dragonfly+, gpaard_hierarchical): 1.005  significant=False
+
+----------------------------------------------------------------------
+size=4K
+----------------------------------------------------------------------
+  dragonfly   gpaard              total=      7.990s +/- 0.226  intra=      5.926s +/- 0.163  inter=      2.065s +/- 0.146
+                                  FCT: mean=0.2635s p50=0.1573s p95=1.0412s max=2.0387s (n=25600 messages)
+                                  global_0_1    achieved=0.023Mbit/s +/- 0.000
+                                  local_group0  achieved=0.136Mbit/s +/- 0.002
+  dragonfly+  gpaard              total=      7.997s +/- 0.200  intra=      5.972s +/- 0.154  inter=      2.025s +/- 0.151
+                                  FCT: mean=0.2675s p50=0.1629s p95=1.0433s max=2.0405s (n=25600 messages)
+                                  global_0_1    achieved=0.023Mbit/s +/- 0.000
+                                  local_group0  achieved=0.406Mbit/s +/- 0.006
+  dragonfly   gpaard_hierarchical total=     11.885s +/- 0.200
+                                  FCT: mean=0.1779s p50=0.0408s p95=1.0370s max=2.0368s (n=15360 messages)
+                                  global_0_1    achieved=0.014Mbit/s +/- 0.000
+                                  local_group0  achieved=0.043Mbit/s +/- 0.000
+  dragonfly+  gpaard_hierarchical total=     11.760s +/- 0.221
+                                  FCT: mean=0.1876s p50=0.0432s p95=1.0390s max=2.0408s (n=15360 messages)
+                                  global_0_1    achieved=0.014Mbit/s +/- 0.000
+                                  local_group0  achieved=0.130Mbit/s +/- 0.001
+  GAP flat  (dragonfly/dragonfly+, gpaard):              0.999  significant=False
+  GAP hier  (dragonfly/dragonfly+, gpaard_hierarchical): 1.011  significant=False
+
+----------------------------------------------------------------------
+size=16K
+----------------------------------------------------------------------
+  dragonfly   gpaard              total=      7.391s +/- 0.268  intra=      5.849s +/- 0.130  inter=      1.542s +/- 0.237
+                                  FCT: mean=0.2416s p50=0.1541s p95=1.0412s max=2.0381s (n=25600 messages)
+                                  global_0_1    achieved=0.084Mbit/s +/- 0.002
+                                  local_group0  achieved=0.507Mbit/s +/- 0.010
+  dragonfly+  gpaard              total=      7.129s +/- 0.242  intra=      5.700s +/- 0.060  inter=      1.429s +/- 0.237
+                                  FCT: mean=0.2385s p50=0.1579s p95=1.0432s max=2.0398s (n=25600 messages)
+                                  global_0_1    achieved=0.087Mbit/s +/- 0.002
+                                  local_group0  achieved=1.564Mbit/s +/- 0.029
+  dragonfly   gpaard_hierarchical total=     11.234s +/- 0.311
+                                  FCT: mean=0.1422s p50=0.0411s p95=1.0370s max=2.0392s (n=15360 messages)
+                                  global_0_1    achieved=0.053Mbit/s +/- 0.001
+                                  local_group0  achieved=0.159Mbit/s +/- 0.002
+  dragonfly+  gpaard_hierarchical total=     10.831s +/- 0.311
+                                  FCT: mean=0.1388s p50=0.0434s p95=1.0388s max=2.0399s (n=15360 messages)
+                                  global_0_1    achieved=0.054Mbit/s +/- 0.001
+                                  local_group0  achieved=0.490Mbit/s +/- 0.008
+  GAP flat  (dragonfly/dragonfly+, gpaard):              1.037  significant=False
+  GAP hier  (dragonfly/dragonfly+, gpaard_hierarchical): 1.037  significant=False
+
+----------------------------------------------------------------------
+size=64K
+----------------------------------------------------------------------
+  dragonfly   gpaard              total=      7.129s +/- 0.225  intra=      5.760s +/- 0.069  inter=      1.369s +/- 0.215
+                                  FCT: mean=0.2141s p50=0.1553s p95=1.0573s max=2.0550s (n=25600 messages)
+                                  global_0_1    achieved=0.329Mbit/s +/- 0.006
+                                  local_group0  achieved=1.993Mbit/s +/- 0.034
+  dragonfly+  gpaard              total=      7.299s +/- 0.209  intra=      5.888s +/- 0.097  inter=      1.411s +/- 0.215
+                                  FCT: mean=0.2166s p50=0.1624s p95=1.0599s max=2.1221s (n=25600 messages)
+                                  global_0_1    achieved=0.329Mbit/s +/- 0.005
+                                  local_group0  achieved=5.939Mbit/s +/- 0.094
+  dragonfly   gpaard_hierarchical total=     10.361s +/- 0.305
+                                  FCT: mean=0.1208s p50=0.0568s p95=1.0385s max=2.0541s (n=15360 messages)
+                                  global_0_1    achieved=0.212Mbit/s +/- 0.003
+                                  local_group0  achieved=0.636Mbit/s +/- 0.010
+  dragonfly+  gpaard_hierarchical total=     10.586s +/- 0.350
+                                  FCT: mean=0.1188s p50=0.0591s p95=1.0352s max=2.0549s (n=15360 messages)
+                                  global_0_1    achieved=0.212Mbit/s +/- 0.004
+                                  local_group0  achieved=1.907Mbit/s +/- 0.033
+  GAP flat  (dragonfly/dragonfly+, gpaard):              0.977  significant=False
+  GAP hier  (dragonfly/dragonfly+, gpaard_hierarchical): 0.979  significant=False
+
+----------------------------------------------------------------------
+size=256K
+----------------------------------------------------------------------
+  dragonfly   gpaard              total=      7.912s +/- 0.243  intra=      6.328s +/- 0.109  inter=      1.584s +/- 0.223
+                                  FCT: mean=0.2565s p50=0.2232s p95=0.3107s max=2.1974s (n=25600 messages)
+                                  global_0_1    achieved=1.218Mbit/s +/- 0.022
+                                  local_group0  achieved=7.444Mbit/s +/- 0.132
+  dragonfly+  gpaard              total=      7.918s +/- 0.248  intra=      6.567s +/- 0.137  inter=      1.351s +/- 0.204
+                                  FCT: mean=0.3133s p50=0.2871s p95=0.4355s max=2.3362s (n=25600 messages)
+                                  global_0_1    achieved=1.224Mbit/s +/- 0.021
+                                  local_group0  achieved=22.503Mbit/s +/- 0.394
+  dragonfly   gpaard_hierarchical total=     10.483s +/- 0.406
+                                  FCT: mean=0.1642s p50=0.1057s p95=1.0504s max=2.0990s (n=15360 messages)
+                                  global_0_1    achieved=0.829Mbit/s +/- 0.017
+                                  local_group0  achieved=2.510Mbit/s +/- 0.051
+  dragonfly+  gpaard_hierarchical total=     10.879s +/- 0.364
+                                  FCT: mean=0.1710s p50=0.1228s p95=1.0506s max=2.0505s (n=15360 messages)
+                                  global_0_1    achieved=0.817Mbit/s +/- 0.014
+                                  local_group0  achieved=7.429Mbit/s +/- 0.131
+  GAP flat  (dragonfly/dragonfly+, gpaard):              0.999  significant=False
+  GAP hier  (dragonfly/dragonfly+, gpaard_hierarchical): 0.964  significant=False
+
+----------------------------------------------------------------------
+size=1M
+----------------------------------------------------------------------
+  dragonfly   gpaard              total=      9.807s +/- 0.272  intra=      8.293s +/- 0.105  inter=      1.514s +/- 0.236
+                                  FCT: mean=0.6807s p50=0.6507s p95=1.2925s max=2.8976s (n=25600 messages)
+                                  global_0_1    achieved=4.247Mbit/s +/- 0.072
+                                  local_group0  achieved=26.329Mbit/s +/- 0.446
+  dragonfly+  gpaard              total=     10.551s +/- 0.226  intra=      9.418s +/- 0.142  inter=      1.132s +/- 0.171
+                                  FCT: mean=0.9158s p50=1.0225s p95=1.4722s max=3.4563s (n=25600 messages)
+                                  global_0_1    achieved=4.060Mbit/s +/- 0.055
+                                  local_group0  achieved=75.450Mbit/s +/- 1.030
+  dragonfly   gpaard_hierarchical total=     12.006s +/- 0.384
+                                  FCT: mean=0.4053s p50=0.3302s p95=1.1149s max=2.7110s (n=15360 messages)
+                                  global_0_1    achieved=3.062Mbit/s +/- 0.053
+                                  local_group0  achieved=9.414Mbit/s +/- 0.162
+  dragonfly+  gpaard_hierarchical total=     12.489s +/- 0.382
+                                  FCT: mean=0.4192s p50=0.3477s p95=1.1188s max=2.6494s (n=15360 messages)
+                                  global_0_1    achieved=3.003Mbit/s +/- 0.052
+                                  local_group0  achieved=27.678Mbit/s +/- 0.482
+  GAP flat  (dragonfly/dragonfly+, gpaard):              0.930  significant=True
+  GAP hier  (dragonfly/dragonfly+, gpaard_hierarchical): 0.961  significant=False
+
+======================================================================
+SUMMARY (gap = avg dragonfly / avg dragonfly+, >1 = DF+ faster; closer to 1.0 = gap closed)
+======================================================================
+      size   gap_flat   sig   gap_hier   sig
+        1K      0.996 False      1.005 False
+        4K      0.999 False      1.011 False
+       16K      1.037 False      1.037 False
+       64K      0.977 False      0.979 False
+      256K      0.999 False      0.964 False
+        1M      0.930  True      0.961 False
+
+Interpretation: if gap_hier is consistently closer to 1.0 than gap_flat across every size, idea #2's gap-closing result (found at bw=10Mbit/4M in test_8) generalizes across this sweep's full size range. If gap_hier diverges from 1.0 at small sizes, the hierarchy's extra steps (10 vs 6, each with fixed per-step overhead) are outweighing its cross-leaf message reduction there.
+

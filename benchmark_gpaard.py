@@ -38,10 +38,11 @@ import random
 import subprocess
 import sys
 import textwrap
+import threading
 import time
 
 from dragonfly_topo import build_network, install_gpaard_routing
-from gpaard import build_gpaard_schedule, group_hosts
+from gpaard import build_gpaard_schedule, build_gpaard_hierarchical_schedule, group_hosts
 
 
 # ---------------------------------------------------------------------------
@@ -54,6 +55,16 @@ from gpaard import build_gpaard_schedule, group_hosts
 def pattern_gpaard(topo):
     """g-PAARD's real 6-step all-reduce schedule (reduce-scatter + all-gather)."""
     schedule = build_gpaard_schedule(topo)
+    steps = schedule["reduce_scatter"] + schedule["all_gather"]
+    return [[(src, dst) for src, dst, _shard in step] for step in steps]
+
+
+def pattern_gpaard_hierarchical(topo):
+    """Optimization idea #2: g-PAARD with the flat O(hosts^2) intra-group
+    any-to-all (steps 3/4) replaced by a 2-level leaf-local-pre-aggregation
+    hierarchy -- see gpaard.py's build_gpaard_hierarchical_schedule. 10
+    steps total (was 6): steps 1/2/5/6 are unchanged."""
+    schedule = build_gpaard_hierarchical_schedule(topo)
     steps = schedule["reduce_scatter"] + schedule["all_gather"]
     return [[(src, dst) for src, dst, _shard in step] for step in steps]
 
@@ -170,6 +181,7 @@ def pattern_nearest_neighbor(topo):
 
 PATTERNS = {
     "gpaard": pattern_gpaard,
+    "gpaard_hierarchical": pattern_gpaard_hierarchical,
     "uniform": pattern_uniform,
     "all_to_all": pattern_all_to_all,
     "hotspot": pattern_hotspot,
@@ -188,6 +200,17 @@ PATTERN_INFO = {
         "for, so it is the baseline every other pattern is judged against: "
         "if Dragonfly+ doesn't win here, the extra spine hardware isn't "
         "paying for itself on the workload that matters."
+    ),
+    "gpaard_hierarchical": (
+        "Optimization idea #2: g-PAARD with steps 3/4's flat O(hosts^2) "
+        "intra-group any-to-all replaced by a 2-level hierarchy -- combine "
+        "within each leaf/router first (cheap, same cost in DF and DF+), "
+        "then exchange among one representative per leaf only (the only "
+        "part that crosses DF+'s expensive leaf-spine hop, now O(leaves^2) "
+        "instead of O(hosts^2)), then broadcast back. test_7's spine-"
+        "oversubscription triage showed hardware alone can't fix the gap "
+        "(no ECMP in this project's routing); this targets the same "
+        "contention by cutting message volume instead."
     ),
     "uniform": (
         "Every host sends once to a uniformly random other host, all at "
@@ -247,8 +270,58 @@ PATTERN_INFO = {
 # 'typical'/control patterns, then hotspot (endpoint worst case), then the
 # fabric-targeted adversarial patterns (the newest addition).
 PATTERN_REPORT_ORDER = [
-    "gpaard", "uniform", "all_to_all", "hotspot", "shift", "nearest_neighbor",
+    "gpaard", "gpaard_hierarchical", "uniform", "all_to_all", "hotspot",
+    "shift", "nearest_neighbor",
 ]
+
+
+# ---------------------------------------------------------------------------
+# Adaptive pattern selector (refinement of optimization idea #2)
+# ---------------------------------------------------------------------------
+# test_1/test_2's generalization run (see DF_vs_DF_Plus_testplan.md) found
+# that gpaard_hierarchical closes the DF-vs-DF+ gap everywhere, but only
+# produces a net ABSOLUTE win when the network is bandwidth-bound: it trades
+# fewer cross-leaf messages for more steps (10 vs 6), each with roughly
+# fixed per-step overhead (TCP setup, settle time) independent of payload
+# size. When there's plenty of bandwidth headroom, that fixed overhead
+# dominates and the extra steps cost more than the message-volume cut saves.
+#
+# This function picks whichever of the two already-verified schedules is
+# expected to win in absolute terms, using a cheap proxy: the time to push
+# one message's worth of bytes across the link at the given bandwidth. It
+# does NOT change how either schedule executes -- it only decides which
+# already-correct schedule's name to hand to the existing benchmark harness,
+# so there is no new execution-order/correctness risk to re-verify.
+#
+# ADAPTIVE_TRANSFER_TIME_THRESHOLD_S is the geometric mean of the two
+# narrowest known boundary points, CALIBRATED against real data from
+# results_test10_adaptive_calibration.txt: at bw=100Mbit, size=2M
+# (transfer_time=0.1678s) gpaard_hierarchical is still a loss, but by
+# size=4M (transfer_time=0.3355s) it has already flipped to a win on both
+# topologies. A geometric (not arithmetic) mean is used since a log-scale
+# midpoint is the natural placement between two multiplicative boundary
+# points.
+#
+# Earlier value (0.53s) was a reasoned-but-uncalibrated placement between a
+# much wider pair of points (0.0839s loss / 3.3554s win, ~40x apart) with no
+# real data in between -- test_10's calibration run put a measurement
+# inside that gap and found the true crossover sits lower, between 2M and
+# 4M, not between 4M and 8M as 0.53s implied. This value replaces it. See
+# DF_vs_DF_Plus_testplan.md's adaptive-selector section for the full story.
+ADAPTIVE_TRANSFER_TIME_THRESHOLD_S = 0.2373
+
+
+def choose_gpaard_pattern_name(size_bytes, bw_mbit, threshold_s=ADAPTIVE_TRANSFER_TIME_THRESHOLD_S):
+    """Pick 'gpaard' or 'gpaard_hierarchical' for this (size, bandwidth)
+    condition. Returns a key that is always valid in PATTERNS, so the result
+    can be fed straight into the existing benchmark harness (e.g.
+    sweep_common.run_topology_instance's patterns=[...] list) with no new
+    pattern-execution logic involved.
+    """
+    transfer_time_s = (size_bytes * 8) / (bw_mbit * 1e6)
+    result = "gpaard_hierarchical" if transfer_time_s >= threshold_s else "gpaard"
+    assert result in PATTERNS, f"{result!r} must be a valid PATTERNS key"
+    return result
 
 
 # ---------------------------------------------------------------------------
@@ -301,14 +374,18 @@ class PortAllocator:
         return ports
 
 
-def run_step(net, step, size_bytes, ports, timeout):
-    """Run one step's messages concurrently over real iperf, return elapsed seconds.
+def _run_step_impl(net, step, size_bytes, ports, timeout, collect_fct):
+    """Shared implementation behind run_step / run_step_with_fct. Launches
+    every message in the step concurrently over real iperf, waits for all of
+    them, and returns the step's elapsed time -- plus, only when
+    collect_fct=True, each message's own (src, dst, duration) completion
+    time alongside it (the per-flow FCT, not just the step's bottleneck).
 
     Each message gets its own port (even repeated destinations, e.g. g-PAARD's
     fan-in collector steps) so concurrent flows to the same host don't collide.
     """
     if not step:
-        return 0.0
+        return (0.0, []) if collect_fct else 0.0
 
     servers = []
     start = time.time()
@@ -319,19 +396,47 @@ def run_step(net, step, size_bytes, ports, timeout):
         time.sleep(0.15)  # let servers bind before clients connect
 
         clients = []
+        client_starts = []
         for (src, dst), port in zip(step, ports):
             src_node = net.get(src)
             dst_ip = net.get(dst).IP()
+            client_starts.append(time.time())
             clients.append(src_node.popen(
                 ["iperf", "-c", dst_ip, "-p", str(port), "-n", str(size_bytes)]))
 
-        for client in clients:
+        # Wait on every client in its OWN thread, concurrently. Waiting on
+        # them one at a time in a single loop would record a client that
+        # finished early as completing whenever the loop got around to
+        # checking it, not when it actually finished -- confirmed by direct
+        # reproduction: three processes with true durations 3s/1s/2s all
+        # recorded ~3s (the slowest one's time) under sequential waiting,
+        # since communicate() on an already-exited process returns
+        # immediately, and time.time() is read right after that. Each
+        # thread's own time.time() read happens exactly when ITS client's
+        # communicate() returns, independent of how long any other client
+        # takes.
+        fct_records = [None] * len(step)
+
+        def _wait_for(i, client, t0, src, dst):
             try:
                 client.communicate(timeout=timeout)
             except subprocess.TimeoutExpired:
                 client.kill()
                 client.communicate()
-        return time.time() - start
+            if collect_fct:
+                fct_records[i] = (src, dst, time.time() - t0)
+
+        waiters = [
+            threading.Thread(target=_wait_for, args=(i, client, t0, src, dst))
+            for i, ((src, dst), client, t0) in enumerate(zip(step, clients, client_starts))
+        ]
+        for waiter in waiters:
+            waiter.start()
+        for waiter in waiters:
+            waiter.join()
+
+        elapsed = time.time() - start
+        return (elapsed, fct_records) if collect_fct else elapsed
     finally:
         for server in servers:
             server.terminate()
@@ -343,6 +448,18 @@ def run_step(net, step, size_bytes, ports, timeout):
                 server.wait()
 
 
+def run_step(net, step, size_bytes, ports, timeout):
+    """Run one step's messages concurrently over real iperf, return elapsed seconds."""
+    return _run_step_impl(net, step, size_bytes, ports, timeout, collect_fct=False)
+
+
+def run_step_with_fct(net, step, size_bytes, ports, timeout):
+    """Like run_step, but also returns each message's own (src, dst, duration)
+    completion time -- the per-flow FCT distribution, not just the step's
+    overall bottleneck time. Returns (elapsed, fct_records)."""
+    return _run_step_impl(net, step, size_bytes, ports, timeout, collect_fct=True)
+
+
 def run_pattern(net, steps, size_bytes, port_allocator, timeout):
     """Run every step of a pattern in order, return (total_time, per_step_times)."""
     step_times = []
@@ -350,6 +467,20 @@ def run_pattern(net, steps, size_bytes, port_allocator, timeout):
         ports = port_allocator.take(len(step))
         step_times.append(run_step(net, step, size_bytes, ports, timeout))
     return sum(step_times), step_times
+
+
+def run_pattern_with_fct(net, steps, size_bytes, port_allocator, timeout):
+    """Like run_pattern, but also returns per_step_fct: a list (one per step)
+    of that step's (src, dst, duration) records -- the full per-flow FCT
+    distribution for the whole pattern. Returns (total_time, step_times, per_step_fct)."""
+    step_times = []
+    per_step_fct = []
+    for step in steps:
+        ports = port_allocator.take(len(step))
+        elapsed, fct_records = run_step_with_fct(net, step, size_bytes, ports, timeout)
+        step_times.append(elapsed)
+        per_step_fct.append(fct_records)
+    return sum(step_times), step_times, per_step_fct
 
 
 # ---------------------------------------------------------------------------

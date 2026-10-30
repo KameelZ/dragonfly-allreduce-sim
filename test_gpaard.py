@@ -17,8 +17,8 @@ import pytest
 from dragonfly_topo import DragonflyTopo
 from dragonfly_plus_topo import DragonflyPlusTopo
 from gpaard import (
-    build_gpaard_schedule, simulate_allreduce, group_hosts,
-    _designated_global_switch, designate_roles,
+    build_gpaard_schedule, build_gpaard_hierarchical_schedule, simulate_allreduce,
+    group_hosts, _designated_global_switch, designate_roles, _leaves_by_group,
 )
 
 
@@ -142,3 +142,84 @@ def test_raises_when_a_group_has_no_hosts():
     topo = DragonflyTopo(num_groups=3, routers_per_group=2, hosts_per_router=[1, 0, 1])
     with pytest.raises(ValueError, match="no hosts|at least 1 host"):
         build_gpaard_schedule(topo)
+
+
+# ---------------------------------------------------------------------------
+# Optimization idea #2: hierarchical (leaf-local pre-aggregation) schedule.
+# Same correctness bar as the flat schedule above, plus a check that it
+# actually reduces cross-leaf message count (the thing it's FOR), not just
+# that it's correct.
+# ---------------------------------------------------------------------------
+def test_hierarchical_allreduce_correctness_symmetric():
+    topo = DragonflyTopo(num_groups=4, routers_per_group=3, hosts_per_router=2, global_links_per_pair=1)
+    simulate_allreduce(topo, schedule_fn=build_gpaard_hierarchical_schedule)
+
+
+def test_hierarchical_allreduce_correctness_asymmetric_groups():
+    topo = DragonflyTopo(num_groups=5, routers_per_group=[2, 4, 3, 2, 5], hosts_per_router=[1, 2, 1, 3, 1])
+    simulate_allreduce(topo, schedule_fn=build_gpaard_hierarchical_schedule)
+
+
+def test_hierarchical_allreduce_correctness_dragonfly_plus():
+    topo = DragonflyPlusTopo(num_groups=4, leaves_per_group=4, spines_per_group=4, hosts_per_leaf=2)
+    simulate_allreduce(topo, schedule_fn=build_gpaard_hierarchical_schedule)
+
+
+def test_hierarchical_allreduce_correctness_single_group():
+    # Degenerate case: 1 host total: the hierarchy's combine/exchange/
+    # broadcast levels should all collapse to empty (nothing to combine)
+    # without crashing, same as the flat schedule's single-group case.
+    topo = DragonflyTopo(num_groups=1, routers_per_group=1, hosts_per_router=1)
+    simulate_allreduce(topo, schedule_fn=build_gpaard_hierarchical_schedule)
+
+
+def test_hierarchical_allreduce_correctness_oversubscribed_spines():
+    # The exact DF+ variant test_7_spine_oversubscription.py benchmarks --
+    # spines_per_group independent of (here, far exceeding) leaves_per_group.
+    topo = DragonflyPlusTopo(num_groups=4, leaves_per_group=4, spines_per_group=16, hosts_per_leaf=2)
+    simulate_allreduce(topo, schedule_fn=build_gpaard_hierarchical_schedule)
+
+
+def test_hierarchical_schedule_reduces_cross_leaf_messages():
+    # The actual point of this optimization: verify the cross-leaf
+    # ("exchange") message count is genuinely smaller than the flat
+    # schedule's cross-leaf message count, not just that both are correct.
+    topo = DragonflyPlusTopo(num_groups=4, leaves_per_group=4, spines_per_group=4, hosts_per_leaf=2)
+
+    flat_step3 = build_gpaard_schedule(topo)["reduce_scatter"][2]
+    leaf_of_host = {
+        host: leaf_id
+        for leaves in _leaves_by_group(topo).values()
+        for leaf_id, hosts in leaves
+        for host in hosts
+    }
+    flat_cross_leaf = sum(1 for (src, dst, _s) in flat_step3 if leaf_of_host[src] != leaf_of_host[dst])
+
+    hier = build_gpaard_hierarchical_schedule(topo)
+    _combine, exchange, _broadcast = hier["reduce_scatter"][2:5]
+
+    assert len(exchange) < flat_cross_leaf, (
+        f"hierarchical exchange step ({len(exchange)} messages) should cross fewer "
+        f"leaf boundaries than the flat schedule's any-to-all ({flat_cross_leaf} "
+        "cross-leaf messages) -- otherwise this isn't actually optimizing anything")
+    # Exact expected counts at this config (4 groups x 4 leaves x [4 leaves
+    # choose ordered pairs = 4*3=12] = 48), pinned down so a future change
+    # that silently breaks the reduction gets caught immediately.
+    assert flat_cross_leaf == 192
+    assert len(exchange) == 48
+
+
+def test_hierarchical_schedule_degenerate_to_flat_when_one_host_per_leaf():
+    # With exactly 1 host per leaf, there's nothing to pre-aggregate: the
+    # combine and broadcast levels should be empty, and exchange should
+    # degrade to exactly the flat schedule's any-to-all (every "leaf" IS a
+    # single host, so "exchange among representatives" IS the full any-to-all).
+    topo = DragonflyPlusTopo(num_groups=4, leaves_per_group=4, spines_per_group=4, hosts_per_leaf=1)
+
+    flat_step3 = build_gpaard_schedule(topo)["reduce_scatter"][2]
+    hier = build_gpaard_hierarchical_schedule(topo)
+    combine, exchange, broadcast = hier["reduce_scatter"][2:5]
+
+    assert combine == []
+    assert broadcast == []
+    assert sorted(exchange) == sorted(flat_step3)

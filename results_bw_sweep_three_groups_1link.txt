@@ -1,0 +1,159 @@
+g-PAARD bandwidth sweep -- config: three_groups_1link
+======================================================================
+generated: 2026-07-24 21:11:25
+groups=3 global_links_per_pair=1 (3 groups -- DF and DF+ are structurally identical here for g-PAARD (baseline / sanity config))
+routers=2 leaves=2 spines=2 hosts=1 delay=1ms
+pattern: gpaard (only)
+bandwidths (Mbit/s): 10, 50, 100, 500, 1000
+message sizes: 4K, 64K, 256K, 1M, 4M
+repeat: 5
+
+----------------------------------------------------------------------
+TOPOLOGY UNDER TEST: dragonfly
+----------------------------------------------------------------------
+Dragonfly -- groups=3, routers/group=[2, 2, 2], hosts/router=[1, 1, 1], global=1
+switches=6 hosts=6 links=12 (host=6, local=3, global=3)
+[full topology plot saved to bandwidth_topology_plots/three_groups_1link_dragonfly.png]
+
+----------------------------------------------------------------------
+TOPOLOGY UNDER TEST: dragonfly+
+----------------------------------------------------------------------
+Dragonfly+ -- groups=3, leaves/group=[2, 2, 2], spines/group=[2, 2, 2], hosts/leaf=[1, 1, 1], global=1
+switches=12 hosts=6 links=21 (host=6, local=12, global=3)
+[full topology plot saved to bandwidth_topology_plots/three_groups_1link_dragonflyplus.png]
+
+======================================================================
+RESULTS: g-PAARD, grouped by BANDWIDTH then message size
+(every iteration, then the average, then speedup from the averages)
+======================================================================
+  g-PAARD's own 6-step reduce-scatter + all-gather all-reduce schedule. This
+  is the actual workload the routing in this project was built for, so it is
+  the baseline every other pattern is judged against: if Dragonfly+ doesn't
+  win here, the extra spine hardware isn't paying for itself on the workload
+  that matters.
+
+----------------------------------------------------------------------
+BANDWIDTH: 10 Mbit/s
+----------------------------------------------------------------------
+  dragonfly       4K: [iter1=3.161s, iter2=2.160s, iter3=4.155s, iter4=4.163s, iter5=4.162s]  avg=3.560s
+  dragonfly+      4K: [iter1=3.181s, iter2=4.167s, iter3=1.181s, iter4=4.172s, iter5=2.176s]  avg=2.976s
+  speedup (4K @ 10Mbit, avg dragonfly / avg dragonfly+): 1.196
+
+  dragonfly      64K: [iter1=3.444s, iter2=2.453s, iter3=5.437s, iter4=3.445s, iter5=4.450s]  avg=3.846s
+  dragonfly+     64K: [iter1=2.467s, iter2=3.468s, iter3=2.467s, iter4=1.470s, iter5=2.467s]  avg=2.468s
+  speedup (64K @ 10Mbit, avg dragonfly / avg dragonfly+): 1.558
+
+  dragonfly     256K: [iter1=2.418s, iter2=3.429s, iter3=2.418s, iter4=3.418s, iter5=3.417s]  avg=3.020s
+  dragonfly+    256K: [iter1=2.530s, iter2=4.521s, iter3=3.527s, iter4=3.514s, iter5=3.530s]  avg=3.524s
+  speedup (256K @ 10Mbit, avg dragonfly / avg dragonfly+): 0.857
+
+  dragonfly       1M: [iter1=8.467s, iter2=7.483s, iter3=7.546s, iter4=7.467s, iter5=8.458s]  avg=7.884s
+  dragonfly+      1M: [iter1=6.868s, iter2=9.858s, iter3=8.851s, iter4=6.867s, iter5=10.694s]  avg=8.628s
+  speedup (1M @ 10Mbit, avg dragonfly / avg dragonfly+): 0.914
+
+  dragonfly       4M: [iter1=24.652s, iter2=23.011s, iter3=22.659s, iter4=24.008s, iter5=23.651s]  avg=23.596s
+  dragonfly+      4M: [iter1=26.016s, iter2=26.002s, iter3=26.020s, iter4=25.678s, iter5=25.999s]  avg=25.943s
+  speedup (4M @ 10Mbit, avg dragonfly / avg dragonfly+): 0.910
+
+----------------------------------------------------------------------
+BANDWIDTH: 50 Mbit/s
+----------------------------------------------------------------------
+  dragonfly       4K: [iter1=3.165s, iter2=3.160s, iter3=4.152s, iter4=5.151s, iter5=4.156s]  avg=3.957s
+  dragonfly+      4K: [iter1=2.177s, iter2=3.177s, iter3=5.167s, iter4=2.181s, iter5=3.176s]  avg=3.176s
+  speedup (4K @ 50Mbit, avg dragonfly / avg dragonfly+): 1.246
+
+  dragonfly      64K: [iter1=2.254s, iter2=3.218s, iter3=4.221s, iter4=3.256s, iter5=2.255s]  avg=3.041s
+  dragonfly+     64K: [iter1=3.269s, iter2=3.273s, iter3=2.275s, iter4=2.278s, iter5=2.273s]  avg=2.674s
+  speedup (64K @ 50Mbit, avg dragonfly / avg dragonfly+): 1.137
+
+  dragonfly     256K: [iter1=2.449s, iter2=2.452s, iter3=3.452s, iter4=2.449s, iter5=1.454s]  avg=2.451s
+  dragonfly+    256K: [iter1=1.504s, iter2=3.497s, iter3=3.499s, iter4=2.498s, iter5=2.504s]  avg=2.700s
+  speedup (256K @ 50Mbit, avg dragonfly / avg dragonfly+): 0.908
+
+  dragonfly       1M: [iter1=3.284s, iter2=4.300s, iter3=4.306s, iter4=4.311s, iter5=4.300s]  avg=4.100s
+  dragonfly+      1M: [iter1=3.450s, iter2=3.508s, iter3=4.514s, iter4=3.466s, iter5=4.466s]  avg=3.881s
+  speedup (1M @ 50Mbit, avg dragonfly / avg dragonfly+): 1.057
+
+  dragonfly       4M: [iter1=9.618s, iter2=8.597s, iter3=7.623s, iter4=7.623s, iter5=7.614s]  avg=8.215s
+  dragonfly+      4M: [iter1=8.019s, iter2=7.368s, iter3=7.365s, iter4=9.202s, iter5=6.561s]  avg=7.703s
+  speedup (4M @ 50Mbit, avg dragonfly / avg dragonfly+): 1.066
+
+----------------------------------------------------------------------
+BANDWIDTH: 100 Mbit/s
+----------------------------------------------------------------------
+  dragonfly       4K: [iter1=1.165s, iter2=3.156s, iter3=3.155s, iter4=2.164s, iter5=5.165s]  avg=2.961s
+  dragonfly+      4K: [iter1=4.173s, iter2=3.176s, iter3=3.176s, iter4=1.183s, iter5=2.177s]  avg=2.777s
+  speedup (4K @ 100Mbit, avg dragonfly / avg dragonfly+): 1.066
+
+  dragonfly      64K: [iter1=4.156s, iter2=1.164s, iter3=1.164s, iter4=2.165s, iter5=3.155s]  avg=2.361s
+  dragonfly+     64K: [iter1=4.264s, iter2=2.275s, iter3=2.279s, iter4=4.274s, iter5=2.279s]  avg=3.074s
+  speedup (64K @ 100Mbit, avg dragonfly / avg dragonfly+): 0.768
+
+  dragonfly     256K: [iter1=3.351s, iter2=5.340s, iter3=3.358s, iter4=4.357s, iter5=2.354s]  avg=3.752s
+  dragonfly+    256K: [iter1=2.405s, iter2=3.403s, iter3=2.408s, iter4=3.408s, iter5=2.406s]  avg=2.806s
+  speedup (256K @ 100Mbit, avg dragonfly / avg dragonfly+): 1.337
+
+  dragonfly       1M: [iter1=2.742s, iter2=3.737s, iter3=3.743s, iter4=1.743s, iter5=2.743s]  avg=2.942s
+  dragonfly+      1M: [iter1=2.856s, iter2=2.856s, iter3=2.852s, iter4=1.857s, iter5=1.857s]  avg=2.456s
+  speedup (1M @ 100Mbit, avg dragonfly / avg dragonfly+): 1.198
+
+  dragonfly       4M: [iter1=4.537s, iter2=6.446s, iter3=5.440s, iter4=4.472s, iter5=3.477s]  avg=4.874s
+  dragonfly+      4M: [iter1=7.633s, iter2=3.623s, iter3=4.620s, iter4=6.623s, iter5=5.620s]  avg=5.624s
+  speedup (4M @ 100Mbit, avg dragonfly / avg dragonfly+): 0.867
+
+----------------------------------------------------------------------
+BANDWIDTH: 500 Mbit/s
+----------------------------------------------------------------------
+  dragonfly       4K: [iter1=2.162s, iter2=5.152s, iter3=2.165s, iter4=4.156s, iter5=2.166s]  avg=3.160s
+  dragonfly+      4K: [iter1=2.182s, iter2=5.163s, iter3=3.173s, iter4=2.177s, iter5=4.177s]  avg=3.374s
+  speedup (4K @ 500Mbit, avg dragonfly / avg dragonfly+): 0.937
+
+  dragonfly      64K: [iter1=3.164s, iter2=1.164s, iter3=1.164s, iter4=4.154s, iter5=4.160s]  avg=2.761s
+  dragonfly+     64K: [iter1=2.274s, iter2=3.280s, iter3=4.269s, iter4=5.261s, iter5=1.278s]  avg=3.273s
+  speedup (64K @ 500Mbit, avg dragonfly / avg dragonfly+): 0.844
+
+  dragonfly     256K: [iter1=5.252s, iter2=3.252s, iter3=3.256s, iter4=5.245s, iter5=3.253s]  avg=4.052s
+  dragonfly+    256K: [iter1=1.374s, iter2=2.369s, iter3=3.367s, iter4=2.375s, iter5=1.374s]  avg=2.172s
+  speedup (256K @ 500Mbit, avg dragonfly / avg dragonfly+): 1.866
+
+  dragonfly       1M: [iter1=1.358s, iter2=3.352s, iter3=1.357s, iter4=3.353s, iter5=3.353s]  avg=2.555s
+  dragonfly+      1M: [iter1=2.502s, iter2=1.504s, iter3=2.503s, iter4=3.495s, iter5=1.504s]  avg=2.302s
+  speedup (1M @ 500Mbit, avg dragonfly / avg dragonfly+): 1.110
+
+  dragonfly       4M: [iter1=3.735s, iter2=3.743s, iter3=3.739s, iter4=2.743s, iter5=1.743s]  avg=3.141s
+  dragonfly+      4M: [iter1=1.888s, iter2=2.883s, iter3=1.888s, iter4=2.889s, iter5=2.885s]  avg=2.487s
+  speedup (4M @ 500Mbit, avg dragonfly / avg dragonfly+): 1.263
+
+----------------------------------------------------------------------
+BANDWIDTH: 1000 Mbit/s
+----------------------------------------------------------------------
+  dragonfly       4K: [iter1=4.157s, iter2=4.161s, iter3=3.159s, iter4=6.156s, iter5=4.155s]  avg=4.358s
+  dragonfly+      4K: [iter1=3.173s, iter2=4.183s, iter3=3.175s, iter4=4.172s, iter5=4.168s]  avg=3.774s
+  speedup (4K @ 1000Mbit, avg dragonfly / avg dragonfly+): 1.155
+
+  dragonfly      64K: [iter1=2.160s, iter2=4.150s, iter3=4.155s, iter4=3.161s, iter5=4.155s]  avg=3.556s
+  dragonfly+     64K: [iter1=1.278s, iter2=6.266s, iter3=3.275s, iter4=4.271s, iter5=2.273s]  avg=3.473s
+  speedup (64K @ 1000Mbit, avg dragonfly / avg dragonfly+): 1.024
+
+  dragonfly     256K: [iter1=2.256s, iter2=2.256s, iter3=1.261s, iter4=2.260s, iter5=3.260s]  avg=2.259s
+  dragonfly+    256K: [iter1=4.371s, iter2=3.370s, iter3=2.374s, iter4=2.371s, iter5=1.375s]  avg=2.772s
+  speedup (256K @ 1000Mbit, avg dragonfly / avg dragonfly+): 0.815
+
+  dragonfly       1M: [iter1=4.354s, iter2=2.358s, iter3=2.358s, iter4=1.356s, iter5=1.357s]  avg=2.356s
+  dragonfly+      1M: [iter1=2.468s, iter2=1.472s, iter3=3.463s, iter4=2.471s, iter5=2.465s]  avg=2.468s
+  speedup (1M @ 1000Mbit, avg dragonfly / avg dragonfly+): 0.955
+
+  dragonfly       4M: [iter1=1.550s, iter2=3.547s, iter3=3.543s, iter4=4.542s, iter5=1.550s]  avg=2.946s
+  dragonfly+      4M: [iter1=3.691s, iter2=2.696s, iter3=2.694s, iter4=3.691s, iter5=3.691s]  avg=3.293s
+  speedup (4M @ 1000Mbit, avg dragonfly / avg dragonfly+): 0.895
+
+======================================================================
+SPEEDUP MATRIX (avg dragonfly / avg dragonfly+)  [>1 = DF+ faster]
+======================================================================
+  bw\size          4K       64K      256K        1M        4M
+       10       1.196     1.558     0.857     0.914     0.910
+       50       1.246     1.137     0.908     1.057     1.066
+      100       1.066     0.768     1.337     1.198     0.867
+      500       0.937     0.844     1.866     1.110     1.263
+     1000       1.155     1.024     0.815     0.955     0.895
+

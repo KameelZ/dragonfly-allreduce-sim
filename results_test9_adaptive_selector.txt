@@ -1,0 +1,51 @@
+Section 9: adaptive pattern selector -- retrospective validation
+======================================================================
+threshold_s = 0.2373 (geometric mean of the two known boundary points -- see benchmark_gpaard.ADAPTIVE_TRANSFER_TIME_THRESHOLD_S's docstring)
+
+For every (topology, bw, size) condition already measured in results_test1/test2/test8's n=20-40 data, this checks whether choose_gpaard_pattern_name's pick matches the schedule that was EMPIRICALLY faster in absolute wall-clock time at that condition. No new Mininet run -- this is a retrospective check against already-trusted data.
+
+context              topology        bw   size    flat_s    hier_s              picked  match?
+----------------------------------------------------------------------
+test_1               dragonfly    100Mb     1K     8.119    12.159              gpaard     YES
+test_1               dragonfly    100Mb     4K     7.990    11.885              gpaard     YES
+test_1               dragonfly    100Mb    16K     7.391    11.234              gpaard     YES
+test_1               dragonfly    100Mb    64K     7.129    10.361              gpaard     YES
+test_1               dragonfly    100Mb   256K     7.912    10.483              gpaard     YES
+test_1               dragonfly    100Mb     1M     9.807    12.006              gpaard     YES
+test_1               dragonfly+   100Mb     1K     8.153    12.102              gpaard     YES
+test_1               dragonfly+   100Mb     4K     7.997    11.760              gpaard     YES
+test_1               dragonfly+   100Mb    16K     7.129    10.831              gpaard     YES
+test_1               dragonfly+   100Mb    64K     7.299    10.586              gpaard     YES
+test_1               dragonfly+   100Mb   256K     7.918    10.879              gpaard     YES
+test_1               dragonfly+   100Mb     1M    10.551    12.489              gpaard     YES
+test_10 (calibration) dragonfly    100Mb     2M    12.794    14.439              gpaard     YES
+test_10 (calibration) dragonfly    100Mb     4M    18.809    18.156 gpaard_hierarchical     YES
+test_10 (calibration) dragonfly    100Mb     8M    31.560    27.583 gpaard_hierarchical     YES
+test_10 (calibration) dragonfly+   100Mb     2M    14.375    14.831              gpaard     YES
+test_10 (calibration) dragonfly+   100Mb     4M    22.593    18.196 gpaard_hierarchical     YES
+test_10 (calibration) dragonfly+   100Mb     8M    37.274    26.678 gpaard_hierarchical     YES
+test_2 (groups=4)    dragonfly    100Mb     4K     8.075    11.935              gpaard     YES
+test_2 (groups=4)    dragonfly    100Mb    64K     7.357    10.457              gpaard     YES
+test_2 (groups=4)    dragonfly    100Mb     1M     9.740    12.352              gpaard     YES
+test_2 (groups=4)    dragonfly+   100Mb     4K     7.897    12.133              gpaard     YES
+test_2 (groups=4)    dragonfly+   100Mb    64K     7.204    11.025              gpaard     YES
+test_2 (groups=4)    dragonfly+   100Mb     1M    10.535    12.057              gpaard     YES
+test_2 (groups=6)    dragonfly    100Mb     4K     9.702    13.107              gpaard     YES
+test_2 (groups=6)    dragonfly    100Mb    64K     9.179    12.193              gpaard     YES
+test_2 (groups=6)    dragonfly    100Mb     1M    13.252    15.068              gpaard     YES
+test_2 (groups=6)    dragonfly+   100Mb     4K     9.816    13.271              gpaard     YES
+test_2 (groups=6)    dragonfly+   100Mb    64K     9.762    12.715              gpaard     YES
+test_2 (groups=6)    dragonfly+   100Mb     1M    14.476    15.527              gpaard     YES
+test_2 (groups=8)    dragonfly    100Mb     4K    12.346    15.425              gpaard     YES
+test_2 (groups=8)    dragonfly    100Mb    64K    11.791    14.583              gpaard     YES
+test_2 (groups=8)    dragonfly    100Mb     1M    16.712    17.987              gpaard     YES
+test_2 (groups=8)    dragonfly+   100Mb     4K    12.459    14.997              gpaard     YES
+test_2 (groups=8)    dragonfly+   100Mb    64K    12.442    14.881              gpaard     YES
+test_2 (groups=8)    dragonfly+   100Mb     1M    18.235    18.308              gpaard     YES
+test_8               dragonfly     10Mb     4M   110.370   103.673 gpaard_hierarchical     YES
+test_8               dragonfly+    10Mb     4M   143.925   103.141 gpaard_hierarchical     YES
+----------------------------------------------------------------------
+38/38 conditions: selector's pick matches the empirically faster schedule.
+
+Every already-measured condition confirms the selector's decision rule, including test_10's calibration data inside the gap that originally had no real measurements (bw=100Mbit, 2M-8M). threshold_s=0.2373 is calibrated against that data, not just a reasoned placement anymore -- the true crossover was found to sit between 2M (0.1678s, a loss) and 4M (0.3355s, a win) at bw=100Mbit, narrower than the original 40x-wide uncalibrated gap (0.0839s-3.3554s).
+

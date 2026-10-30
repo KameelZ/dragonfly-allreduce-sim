@@ -1,0 +1,73 @@
+Section 7 (optimization triage): spine oversubscription
+======================================================================
+generated: 2026-10-09 00:18:53
+groups=4 width=4 hosts/router=2 (8 hosts/group) bw=10Mbit size=4M delay=1ms global_links=1  repeat=30
+
+Does giving DF+ more parallel spine paths (same hop count, more capacity) narrow the gap test_3_mechanism_isolating.py found at this exact bw/size point (0.769-0.776 there)? Fast triage signal for whether optimization idea #2 (leaf-local pre-aggregation) is worth building -- see DF_vs_DF_Plus_testplan.md's optimization proposal section.
+
+g-PAARD's own 6-step reduce-scatter + all-gather all-reduce schedule. This is the actual workload the routing in this project was built for, so it is the baseline every other pattern is judged against: if Dragonfly+ doesn't win here, the extra spine hardware isn't paying for itself on the workload that matters.
+
+----------------------------------------------------------------------
+TOPOLOGY UNDER TEST: dragonfly   [dragonfly]
+----------------------------------------------------------------------
+Dragonfly -- groups=4, routers/group=[4, 4, 4, 4], hosts/router=[2, 2, 2, 2], global=1
+switches=16 hosts=32 links=62 (host=32, local=24, global=6)
+[full topology plot saved to spine_oversubscription_plots/dragonfly.png]
+
+----------------------------------------------------------------------
+TOPOLOGY UNDER TEST: dragonfly+   [dragonfly+_1x_spines]
+----------------------------------------------------------------------
+Dragonfly+ -- groups=4, leaves/group=[4, 4, 4, 4], spines/group=[4, 4, 4, 4], hosts/leaf=[2, 2, 2, 2], global=1
+switches=32 hosts=32 links=102 (host=32, local=64, global=6)
+[full topology plot saved to spine_oversubscription_plots/dragonfly+_1x_spines.png]
+
+----------------------------------------------------------------------
+TOPOLOGY UNDER TEST: dragonfly+   [dragonfly+_2x_spines]
+----------------------------------------------------------------------
+Dragonfly+ -- groups=4, leaves/group=[4, 4, 4, 4], spines/group=[8, 8, 8, 8], hosts/leaf=[2, 2, 2, 2], global=1
+switches=48 hosts=32 links=166 (host=32, local=128, global=6)
+[full topology plot saved to spine_oversubscription_plots/dragonfly+_2x_spines.png]
+
+----------------------------------------------------------------------
+TOPOLOGY UNDER TEST: dragonfly+   [dragonfly+_4x_spines]
+----------------------------------------------------------------------
+Dragonfly+ -- groups=4, leaves/group=[4, 4, 4, 4], spines/group=[16, 16, 16, 16], hosts/leaf=[2, 2, 2, 2], global=1
+switches=80 hosts=32 links=294 (host=32, local=256, global=6)
+[full topology plot saved to spine_oversubscription_plots/dragonfly+_4x_spines.png]
+
+======================================================================
+RESULTS: mean [95% CI], n=30
+======================================================================
+  dragonfly              total=    110.524s +/- 1.179  intra=    101.529s +/- 1.265
+                         FCT: mean=14.7305s p50=14.3059s p95=24.0807s max=28.6714s (n=19200 messages)
+                         global_0_1    achieved=2.383Mbit/s +/- 0.020
+                         local_group0  achieved=13.870Mbit/s +/- 0.101
+  dragonfly+_1x_spines   total=    143.746s +/- 1.819  intra=    134.853s +/- 1.863
+                         FCT: mean=19.5994s p50=20.3929s p95=30.6594s max=48.4271s (n=19200 messages)
+                         global_0_1    achieved=1.849Mbit/s +/- 0.019
+                         local_group0  achieved=31.711Mbit/s +/- 0.176
+  dragonfly+_2x_spines   total=    144.068s +/- 2.159  intra=    135.556s +/- 2.113
+                         FCT: mean=19.5977s p50=20.5037s p95=30.4991s max=48.4395s (n=19200 messages)
+                         global_0_1    achieved=1.846Mbit/s +/- 0.022
+                         local_group0  achieved=31.729Mbit/s +/- 0.126
+  dragonfly+_4x_spines   total=    143.403s +/- 1.883  intra=    134.785s +/- 1.781
+                         FCT: mean=19.5360s p50=20.2985s p95=30.5908s max=47.3250s (n=19200 messages)
+                         global_0_1    achieved=1.848Mbit/s +/- 0.019
+                         local_group0  achieved=31.554Mbit/s +/- 0.095
+
+----------------------------------------------------------------------
+COMPARISONS (speedup = avg A / avg B, >1 = A faster)
+----------------------------------------------------------------------
+dragonfly vs each DF+ spine ratio:
+  dragonfly vs dragonfly+_1x_spines (total): 0.769  significant=True (replication check against test_3's 0.769-0.776 at this exact bw/size)
+  dragonfly vs dragonfly+_2x_spines (total): 0.767  significant=True
+  dragonfly vs dragonfly+_4x_spines (total): 0.771  significant=True
+
+Dose-response (consecutive spine-ratio steps, >1 = more spines is FASTER):
+  dragonfly+_1x_spines vs dragonfly+_2x_spines: total=0.998 significant=False   intra-only=0.995 significant=False
+  dragonfly+_2x_spines vs dragonfly+_4x_spines: total=1.005 significant=False   intra-only=1.006 significant=False
+
+Full range, dragonfly+_1x_spines vs dragonfly+_4x_spines (total): 1.002  significant=False
+
+Interpretation guide: if the dose-response comparisons above show a consistent, significant speedup as spine count grows, contention is a real driver and optimization idea #2 (leaf-local pre-aggregation) is worth building. If the spine-ratio variants are statistically indistinguishable from each other, the gap is likely dominated by the fixed propagation delay test_6 measured precisely, which more spine capacity can't fix.
+

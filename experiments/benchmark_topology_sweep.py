@@ -58,6 +58,10 @@ from argparse import Namespace
 import matplotlib
 matplotlib.use("Agg")  # headless: never try to open a GUI window under sudo
 
+# This file lives in experiments/; put the project root on the path so the
+# top-level modules (dragonfly_topo, benchmark_gpaard, ...) import cleanly.
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 from dragonfly_topo import build_network, install_gpaard_routing
 from benchmark_gpaard import (
     PATTERNS, PATTERN_INFO, PATTERN_REPORT_ORDER,

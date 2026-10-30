@@ -1,0 +1,53 @@
+Section 0: measurement-floor sanity check
+======================================================================
+generated: 2026-10-06 20:56:32
+groups=[2, 3] width=4 hosts/router=2 (8 hosts/group) bw=100Mbit delay=1ms global_links=1
+message size: 64K  repeat: 10
+
+DF and DF+ are STRUCTURALLY IDENTICAL at <=3 groups -- any speedup != 1.0 measured below is pure measurement pipeline noise/bias, not a real topology effect. This calibrates the pipeline's own noise floor.
+
+----------------------------------------------------------------------
+TOPOLOGY UNDER TEST: dragonfly   [groups2_dragonfly]
+----------------------------------------------------------------------
+Dragonfly -- groups=2, routers/group=[4, 4], hosts/router=[2, 2], global=1
+switches=8 hosts=16 links=29 (host=16, local=12, global=1)
+[full topology plot saved to sanity_topology_plots/groups2_dragonfly.png]
+
+----------------------------------------------------------------------
+TOPOLOGY UNDER TEST: dragonfly+   [groups2_dragonflyplus]
+----------------------------------------------------------------------
+Dragonfly+ -- groups=2, leaves/group=[4, 4], spines/group=[4, 4], hosts/leaf=[2, 2], global=1
+switches=16 hosts=16 links=49 (host=16, local=32, global=1)
+[full topology plot saved to sanity_topology_plots/groups2_dragonflyplus.png]
+
+----------------------------------------------------------------------
+TOPOLOGY UNDER TEST: dragonfly   [groups3_dragonfly]
+----------------------------------------------------------------------
+Dragonfly -- groups=3, routers/group=[4, 4, 4], hosts/router=[2, 2, 2], global=1
+switches=12 hosts=24 links=45 (host=24, local=18, global=3)
+[full topology plot saved to sanity_topology_plots/groups3_dragonfly.png]
+
+----------------------------------------------------------------------
+TOPOLOGY UNDER TEST: dragonfly+   [groups3_dragonflyplus]
+----------------------------------------------------------------------
+Dragonfly+ -- groups=3, leaves/group=[4, 4, 4], spines/group=[4, 4, 4], hosts/leaf=[2, 2, 2], global=1
+switches=24 hosts=24 links=75 (host=24, local=48, global=3)
+[full topology plot saved to sanity_topology_plots/groups3_dragonflyplus.png]
+
+======================================================================
+RESULTS: mean [95% CI], n=10. Expect speedup close to 1.0 with a CI that contains 1.0, and 'significant=False' everywhere.
+======================================================================
+----------------------------------------------------------------------
+groups=2 (structurally identical DF/DF+)
+----------------------------------------------------------------------
+  dragonfly   total=4.467s +/- 0.471
+  dragonfly+  total=4.873s +/- 0.683
+  speedup (avg dragonfly / avg dragonfly+): 0.917  significant=False  (expected)
+
+----------------------------------------------------------------------
+groups=3 (structurally identical DF/DF+)
+----------------------------------------------------------------------
+  dragonfly   total=6.092s +/- 0.578
+  dragonfly+  total=6.146s +/- 0.504
+  speedup (avg dragonfly / avg dragonfly+): 0.991  significant=False  (expected)
+

@@ -1,0 +1,56 @@
+Section 8 (optimization #2): leaf-local pre-aggregation (gpaard_hierarchical)
+======================================================================
+generated: 2026-10-10 13:20:32
+groups=4 width=4 hosts/router=2 (8 hosts/group) bw=10Mbit size=4M delay=1ms global_links=1  repeat=30
+
+Does replacing g-PAARD's flat O(hosts^2) intra-group any-to-all with a leaf-local-combine + cross-leaf-exchange + broadcast-back hierarchy narrow the gap test_3/test_7 found at this exact bw/size point? Applied identically to both topologies -- what matters is whether the GAP narrows, not just whether either topology gets faster on its own.
+
+g-PAARD's own 6-step reduce-scatter + all-gather all-reduce schedule. This is the actual workload the routing in this project was built for, so it is the baseline every other pattern is judged against: if Dragonfly+ doesn't win here, the extra spine hardware isn't paying for itself on the workload that matters.
+
+Optimization idea #2: g-PAARD with steps 3/4's flat O(hosts^2) intra-group any-to-all replaced by a 2-level hierarchy -- combine within each leaf/router first (cheap, same cost in DF and DF+), then exchange among one representative per leaf only (the only part that crosses DF+'s expensive leaf-spine hop, now O(leaves^2) instead of O(hosts^2)), then broadcast back. test_7's spine-oversubscription triage showed hardware alone can't fix the gap (no ECMP in this project's routing); this targets the same contention by cutting message volume instead.
+
+----------------------------------------------------------------------
+TOPOLOGY UNDER TEST: dragonfly   [hierarchical_compare_dragonfly]
+----------------------------------------------------------------------
+Dragonfly -- groups=4, routers/group=[4, 4, 4, 4], hosts/router=[2, 2, 2, 2], global=1
+switches=16 hosts=32 links=62 (host=32, local=24, global=6)
+[full topology plot saved to hierarchical_pattern_plots/hierarchical_compare_dragonfly.png]
+
+----------------------------------------------------------------------
+TOPOLOGY UNDER TEST: dragonfly+   [hierarchical_compare_dragonflyplus]
+----------------------------------------------------------------------
+Dragonfly+ -- groups=4, leaves/group=[4, 4, 4, 4], spines/group=[4, 4, 4, 4], hosts/leaf=[2, 2, 2, 2], global=1
+switches=32 hosts=32 links=102 (host=32, local=64, global=6)
+[full topology plot saved to hierarchical_pattern_plots/hierarchical_compare_dragonflyplus.png]
+
+======================================================================
+RESULTS: mean [95% CI], n=30
+======================================================================
+  dragonfly   gpaard              total=    110.370s +/- 1.203
+                                  FCT: mean=14.7392s p50=14.3135s p95=24.1807s max=29.7655s (n=19200 messages)
+                                  global_0_1    achieved=2.383Mbit/s +/- 0.021
+                                  local_group0  achieved=13.799Mbit/s +/- 0.059
+  dragonfly   gpaard_hierarchical total=    103.673s +/- 0.465
+                                  FCT: mean=10.5365s p50=10.3391s p95=25.0072s max=28.1146s (n=11520 messages)
+                                  global_0_1    achieved=2.473Mbit/s +/- 0.010
+                                  local_group0  achieved=7.572Mbit/s +/- 0.029
+  dragonfly+  gpaard              total=    143.925s +/- 2.015
+                                  FCT: mean=19.5824s p50=20.3632s p95=30.5531s max=47.2361s (n=19200 messages)
+                                  global_0_1    achieved=1.847Mbit/s +/- 0.020
+                                  local_group0  achieved=31.725Mbit/s +/- 0.155
+  dragonfly+  gpaard_hierarchical total=    103.141s +/- 0.632
+                                  FCT: mean=10.3005s p50=10.0769s p95=23.5633s max=27.9862s (n=11520 messages)
+                                  global_0_1    achieved=2.484Mbit/s +/- 0.013
+                                  local_group0  achieved=22.388Mbit/s +/- 0.115
+
+----------------------------------------------------------------------
+COMPARISONS (speedup = avg A / avg B, >1 = A faster)
+----------------------------------------------------------------------
+  dragonfly: gpaard vs gpaard_hierarchical: 1.065  significant=True   (does the optimization help DF, which has no hop-cost asymmetry to exploit?)
+  dragonfly+: gpaard vs gpaard_hierarchical: 1.395  significant=True   (does the optimization help DF+ -- the actual target)
+
+  GAP before (dragonfly/dragonfly+, both on flat gpaard):          0.767  significant=True   (compare to test_3/test_7's 0.769-0.776)
+  GAP after  (dragonfly/dragonfly+, both on gpaard_hierarchical):  1.005  significant=False
+
+Interpretation guide: if GAP after is closer to 1.0 than GAP before (and dragonfly+'s own before/after comparison shows a significant speedup), the optimization is working as intended -- cutting cross-leaf message volume narrows the structural disadvantage test_6 measured precisely. If GAP after is about the same as GAP before, the bottleneck is elsewhere (e.g. the fixed propagation delay itself, independent of message count).
+

@@ -35,6 +35,7 @@ from mininet.clean import cleanup
 from collections import deque
 from functools import partial
 import argparse
+import hashlib
 import sys
 import time
 
@@ -157,19 +158,33 @@ class DragonflyTopo(Topo):
         """
         # Per-group cursor for round-robin router selection.
         next_router = {g: 0 for g in range(self.num_groups)}
+        pairs = [(g1, g2) for g1 in range(self.num_groups)
+                for g2 in range(g1 + 1, self.num_groups)]
 
-        for g1 in range(self.num_groups):
-            for g2 in range(g1 + 1, self.num_groups):
-                for _ in range(self.global_links_per_pair):
-                    r1 = next_router[g1] % self.routers_per_group[g1]
-                    r2 = next_router[g2] % self.routers_per_group[g2]
-                    next_router[g1] += 1
-                    next_router[g2] += 1
+        # Assign every pair's FIRST global link before any pair's second.
+        # g-PAARD designates one host per pair by picking that pair's link
+        # endpoint router as a collector (gpaard.py's designate_roles) -- if
+        # the round-robin instead completed one pair fully before starting
+        # the next (the original ordering here), the per-group cursor could
+        # wrap WITHIN that pair's own redundant links and reuse the same
+        # router as a DIFFERENT pair's only/first link, silently piling two
+        # remote groups' designated-collector role onto one host. Iterating
+        # pairs in the outer loop and redundancy in the inner loop instead
+        # guarantees every pair's primary link lands on a fresh router as
+        # long as there are at least as many routers as pairs; only the
+        # redundant extra links from global_links_per_pair>1 can still wrap
+        # into an already-used router, and g-PAARD never designates those.
+        for _ in range(self.global_links_per_pair):
+            for g1, g2 in pairs:
+                r1 = next_router[g1] % self.routers_per_group[g1]
+                r2 = next_router[g2] % self.routers_per_group[g2]
+                next_router[g1] += 1
+                next_router[g2] += 1
 
-                    sw1 = self.router_map[(g1, r1)]
-                    sw2 = self.router_map[(g2, r2)]
-                    self.addLink(sw1, sw2,
-                                 bw=self.link_bw, delay=self.link_delay)
+                sw1 = self.router_map[(g1, r1)]
+                sw2 = self.router_map[(g2, r2)]
+                self.addLink(sw1, sw2,
+                             bw=self.link_bw, delay=self.link_delay)
 
     def topology_label(self):
         """Short human-readable description of this topology's parameters,
@@ -216,17 +231,25 @@ def _build_switch_graph(net):
 def _shortest_path_next_hops(adj, dst_switch):
     """BFS from ``dst_switch`` over the router graph.
 
-    Returns ``next_hop[switch] = neighbor`` giving, for every switch, the
-    neighbour to forward to in order to make progress toward ``dst_switch``
-    along a shortest path. Neighbours are visited in sorted order so the result
-    is deterministic (a fixed shortest-path tree per destination).
+    Returns ``candidates[switch] = [neighbor, ...]`` giving, for every switch,
+    the FULL set of neighbours that lie on a shortest path toward
+    ``dst_switch`` -- i.e. every neighbour whose distance to ``dst_switch`` is
+    exactly one less than ``switch``'s own distance. Each list is sorted for
+    determinism. Picking ANY member of a switch's list is safe: distance to
+    the destination strictly decreases every hop, so the result is loop-free
+    and reaches the destination in the true minimum hop count regardless of
+    which candidate gets chosen at each switch (the standard equal-cost-
+    multipath/ECMP invariant) -- this is what makes it safe for
+    select_path_next_hop() to pick among multiple candidates instead of being
+    forced to return a single fixed tree.
 
     Per-destination shortest-path forwarding is inherently loop-free, which is
     why this replaces STP entirely: there is no spanning tree and no flooding,
     so the network uses the real Dragonfly link diversity instead of collapsing
     onto one tree.
     """
-    next_hop = {}
+    # Pass 1: plain BFS distances from dst_switch.
+    dist = {dst_switch: 0}
     visited = {dst_switch}
     queue = deque([dst_switch])
     while queue:
@@ -234,9 +257,18 @@ def _shortest_path_next_hops(adj, dst_switch):
         for neighbor in sorted(adj[current]):
             if neighbor not in visited:
                 visited.add(neighbor)
-                next_hop[neighbor] = current
+                dist[neighbor] = dist[current] + 1
                 queue.append(neighbor)
-    return next_hop
+
+    # Pass 2: for every switch, collect ALL neighbours one hop closer to the
+    # destination -- not just the first one BFS happened to visit.
+    candidates = {}
+    for switch, switch_dist in dist.items():
+        if switch == dst_switch:
+            continue
+        candidates[switch] = sorted(
+            n for n in adj[switch] if dist.get(n) == switch_dist - 1)
+    return candidates
 
 
 def select_path_next_hop(switch_name, dst_switch, adj, shortest_tree):
@@ -244,21 +276,47 @@ def select_path_next_hop(switch_name, dst_switch, adj, shortest_tree):
 
     >>> ADAPTIVE ROUTING INJECTION POINT <<<
     This is the single decision function the routing layer consults for every
-    (current switch, destination) pair. Right now it returns the deterministic
-    *minimal* (shortest-path) next hop -- the "MIN routing" baseline the
-    g-PAARD paper evaluates against (see gpaard.py).
+    (current switch, destination) pair. ``shortest_tree`` (from
+    _shortest_path_next_hops) maps switch -> list of every neighbour that lies
+    on a shortest path to dst_switch; when that list has more than one entry,
+    this is a real equal-cost-multipath (ECMP) opportunity -- most commonly a
+    Dragonfly+ leaf with several spines in its group all equally one hop
+    closer to a cross-leaf destination. Resolving ties via a stable hash of
+    (switch_name, dst_switch) spreads different switches' traffic to the same
+    destination across different spines, instead of every switch in the
+    network always picking the lexicographically-first candidate (which is
+    what a plain shortest-path TREE -- one fixed next hop per switch -- would
+    do, and is why adding spines alone (idea #1) didn't help: the extra
+    spines were structurally unreachable, never a traffic-pattern problem).
+
+    Deliberately NOT Python's builtin hash() -- that's randomized per
+    process (PYTHONHASHSEED) by default, so routing would be internally
+    consistent within one run but silently different across repeated runs.
+    Also deliberately NOT zlib.crc32: its low-order bits (the ones `% N`
+    actually reads) have poor diffusion for structurally similar keys like
+    "l1->l0" vs "l2->l0" -- differing by one digit in a fixed position can
+    leave the low bits identical, silently collapsing every source switch
+    onto the SAME candidate (caught by this change's own test suite:
+    test_dragonfly_topo.py's spread test). hashlib.md5 mixes far better for
+    this kind of structured key and is equally stable/portable.
 
     NOTE: g-PAARD itself is NOT implemented here. g-PAARD (gpaard.py) is an
     all-reduce communication *pattern* -- it decides which hosts exchange
     data and in what order -- and runs unchanged on top of whatever unicast
-    routing this function produces. This injection point is for swapping in
-    an *adaptive/load-aware routing* policy instead (e.g. UGAL: weigh the
-    minimal next hop against non-minimal, via-an-intermediate-group hops
-    using live link-load). The surrounding install_gpaard_routing() machinery
-    (flow installation, port lookup) does not need to change -- only this
-    policy does.
+    routing this function produces. The surrounding install_gpaard_routing()
+    machinery (flow installation, port lookup) does not need to change for
+    this -- it already asks this function for one next hop per (switch,
+    destination) independently, so per-switch tie-breaking is all that's
+    needed to make different leaves use different spines.
     """
-    return shortest_tree.get(switch_name)
+    candidates = shortest_tree.get(switch_name)
+    if not candidates:
+        return None
+    if len(candidates) == 1:
+        return candidates[0]
+    digest = hashlib.md5(f"{switch_name}->{dst_switch}".encode()).digest()
+    index = int.from_bytes(digest[:4], "big") % len(candidates)
+    return candidates[index]
 
 
 def install_gpaard_routing(net):
@@ -271,12 +329,15 @@ def install_gpaard_routing(net):
 
     Strategy (controller-less, deterministic):
         - Hosts use static ARP (set in main), so no broadcast/flooding occurs.
-        - For each destination host we compute a shortest-path tree over the
-          router graph and, at every switch, install one flow matching the
-          host's destination MAC and outputting toward the chosen next hop.
+        - For each destination host we compute, per switch, the full set of
+          equal-cost shortest-path next hops over the router graph
+          (_shortest_path_next_hops) and install one flow matching the
+          host's destination MAC and outputting toward one chosen next hop.
         - The next hop is chosen by select_path_next_hop(), the adaptive-
-          routing policy hook, so swapping in a load-aware algorithm later
-          touches one place.
+          routing policy hook -- when a switch has more than one equal-cost
+          candidate (e.g. a Dragonfly+ leaf with several spines in its
+          group), this is where ECMP-style tie-breaking happens, so swapping
+          in a different load-aware policy later touches one place.
 
     Switches run in OVS 'secure' fail-mode (default for OVSSwitch) with no
     controller, so only these explicitly installed flows forward traffic.

@@ -1,0 +1,16 @@
+run_tonight_multipath.py -- idea #5 (multipath) and idea #6 (hierarchical + multipath)
+======================================================================
+generated: 2026-10-13 05:31:14
+total wall-clock time: 481.4 minutes
+
+[OK] Idea #5: ECMP multipath across spines, flat gpaard, same condition as test_7
+    script: experiments/test_11_multipath_spines.py
+    output: results_test11_multipath_spines.txt
+    time:   15212.8s
+
+[OK] Idea #6: idea #2 (hierarchical) + idea #5 (multipath) combined
+    script: experiments/test_12_hierarchical_plus_multipath.py
+    output: results_test12_hierarchical_plus_multipath.txt
+    time:   13666.7s
+
+All sections completed. Per DF_vs_DF_Plus_testplan.md's verification step: sanity-check results_test0_sanity.txt's speedup numbers land close to 1.0 with significant=False everywhere BEFORE trusting results_test1/2/3/4's numbers -- if test_0 shows a significant difference, the measurement pipeline itself is biased.

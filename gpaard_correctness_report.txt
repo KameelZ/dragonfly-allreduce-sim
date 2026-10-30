@@ -1,6 +1,6 @@
 g-PAARD correctness verification report
 ==================================================================================
-generated: 2026-07-08 19:21:06
+generated: 2026-10-09 15:41:50
 total cases: 54  (curated: 14, randomized: 40)
 checks per case: FUNCTIONAL = simulate_allreduce() (every host ends up with every host's contribution); STRUCTURAL = intra-group steps stay in-group, inter-group step rides a real direct link
 

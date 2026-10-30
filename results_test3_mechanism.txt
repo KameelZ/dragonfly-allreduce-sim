@@ -1,0 +1,187 @@
+Section 3: mechanism-isolating sweep (low bandwidth / large message corner, + per-link utilization)
+======================================================================
+generated: 2026-10-07 01:08:23
+groups=4 width=4 hosts/router=2 (8 hosts/group) delay=1ms
+bandwidths (Mbit/s): 10, 50
+message sizes: 1M, 4M
+global_links_per_pair: [1, 2]
+pattern: gpaard (only)  repeat: 30
+
+g-PAARD's own 6-step reduce-scatter + all-gather all-reduce schedule. This is the actual workload the routing in this project was built for, so it is the baseline every other pattern is judged against: if Dragonfly+ doesn't win here, the extra spine hardware isn't paying for itself on the workload that matters.
+
+Utilization tracks the global link (groups 0<->1, identical cost on both topologies by construction -- a control) and a representative intra-group link in group 0 (DF: flat router mesh; DF+: leaf-spine, no DF equivalent).
+
+----------------------------------------------------------------------
+TOPOLOGY UNDER TEST: dragonfly   [gl1_bw10_dragonfly]
+----------------------------------------------------------------------
+Dragonfly -- groups=4, routers/group=[4, 4, 4, 4], hosts/router=[2, 2, 2, 2], global=1
+switches=16 hosts=32 links=62 (host=32, local=24, global=6)
+[full topology plot saved to mechanism_topology_plots/gl1_bw10_dragonfly.png]
+
+----------------------------------------------------------------------
+TOPOLOGY UNDER TEST: dragonfly+   [gl1_bw10_dragonflyplus]
+----------------------------------------------------------------------
+Dragonfly+ -- groups=4, leaves/group=[4, 4, 4, 4], spines/group=[4, 4, 4, 4], hosts/leaf=[2, 2, 2, 2], global=1
+switches=32 hosts=32 links=102 (host=32, local=64, global=6)
+[full topology plot saved to mechanism_topology_plots/gl1_bw10_dragonflyplus.png]
+
+----------------------------------------------------------------------
+TOPOLOGY UNDER TEST: dragonfly+   [gl1_bw50_dragonflyplus]
+----------------------------------------------------------------------
+Dragonfly+ -- groups=4, leaves/group=[4, 4, 4, 4], spines/group=[4, 4, 4, 4], hosts/leaf=[2, 2, 2, 2], global=1
+switches=32 hosts=32 links=102 (host=32, local=64, global=6)
+[full topology plot saved to mechanism_topology_plots/gl1_bw50_dragonflyplus.png]
+
+----------------------------------------------------------------------
+TOPOLOGY UNDER TEST: dragonfly   [gl1_bw50_dragonfly]
+----------------------------------------------------------------------
+Dragonfly -- groups=4, routers/group=[4, 4, 4, 4], hosts/router=[2, 2, 2, 2], global=1
+switches=16 hosts=32 links=62 (host=32, local=24, global=6)
+[full topology plot saved to mechanism_topology_plots/gl1_bw50_dragonfly.png]
+
+----------------------------------------------------------------------
+TOPOLOGY UNDER TEST: dragonfly   [gl2_bw10_dragonfly]
+----------------------------------------------------------------------
+Dragonfly -- groups=4, routers/group=[4, 4, 4, 4], hosts/router=[2, 2, 2, 2], global=2
+switches=16 hosts=32 links=68 (host=32, local=24, global=12)
+[full topology plot saved to mechanism_topology_plots/gl2_bw10_dragonfly.png]
+
+----------------------------------------------------------------------
+TOPOLOGY UNDER TEST: dragonfly+   [gl2_bw10_dragonflyplus]
+----------------------------------------------------------------------
+Dragonfly+ -- groups=4, leaves/group=[4, 4, 4, 4], spines/group=[4, 4, 4, 4], hosts/leaf=[2, 2, 2, 2], global=2
+switches=32 hosts=32 links=108 (host=32, local=64, global=12)
+[full topology plot saved to mechanism_topology_plots/gl2_bw10_dragonflyplus.png]
+
+----------------------------------------------------------------------
+TOPOLOGY UNDER TEST: dragonfly+   [gl2_bw50_dragonflyplus]
+----------------------------------------------------------------------
+Dragonfly+ -- groups=4, leaves/group=[4, 4, 4, 4], spines/group=[4, 4, 4, 4], hosts/leaf=[2, 2, 2, 2], global=2
+switches=32 hosts=32 links=108 (host=32, local=64, global=12)
+[full topology plot saved to mechanism_topology_plots/gl2_bw50_dragonflyplus.png]
+
+----------------------------------------------------------------------
+TOPOLOGY UNDER TEST: dragonfly   [gl2_bw50_dragonfly]
+----------------------------------------------------------------------
+Dragonfly -- groups=4, routers/group=[4, 4, 4, 4], hosts/router=[2, 2, 2, 2], global=2
+switches=16 hosts=32 links=68 (host=32, local=24, global=12)
+[full topology plot saved to mechanism_topology_plots/gl2_bw50_dragonfly.png]
+
+======================================================================
+RESULTS: mean [95% CI], n=30
+======================================================================
+----------------------------------------------------------------------
+global_links_per_pair=1  bandwidth=10 Mbit/s
+----------------------------------------------------------------------
+  size=1M
+    dragonfly   total=     33.805s +/- 0.344  intra=     30.816s +/- 0.312
+                FCT: mean=5.7645s p50=6.2550s p95=7.1718s max=8.5374s (n=19200 messages)
+                global_0_1    achieved=1.752Mbit/s +/- 0.015
+                local_group0  achieved=10.555Mbit/s +/- 0.090
+    dragonfly+  total=     38.844s +/- 0.307  intra=     35.689s +/- 0.260
+                FCT: mean=6.6046s p50=7.6172s p95=9.4059s max=11.0188s (n=19200 messages)
+                global_0_1    achieved=1.527Mbit/s +/- 0.011
+                local_group0  achieved=27.525Mbit/s +/- 0.193
+    speedup total: 0.870  significant=True   speedup intra-only: 0.863  significant=True
+
+  size=4M
+    dragonfly   total=    110.172s +/- 0.932  intra=    101.373s +/- 0.867
+                FCT: mean=14.7141s p50=14.2818s p95=24.1928s max=28.9304s (n=19200 messages)
+                global_0_1    achieved=2.378Mbit/s +/- 0.014
+                local_group0  achieved=13.783Mbit/s +/- 0.075
+    dragonfly+  total=    142.012s +/- 1.828  intra=    133.612s +/- 1.744
+                FCT: mean=19.5806s p50=20.4406s p95=30.5095s max=47.4244s (n=19200 messages)
+                global_0_1    achieved=1.867Mbit/s +/- 0.019
+                local_group0  achieved=31.726Mbit/s +/- 0.128
+    speedup total: 0.776  significant=True   speedup intra-only: 0.759  significant=True
+
+----------------------------------------------------------------------
+global_links_per_pair=1  bandwidth=50 Mbit/s
+----------------------------------------------------------------------
+  size=1M
+    dragonfly   total=     12.719s +/- 0.368  intra=     11.110s +/- 0.169
+                FCT: mean=1.2556s p50=1.2620s p95=1.8002s max=3.5365s (n=19200 messages)
+                global_0_1    achieved=3.603Mbit/s +/- 0.066
+                local_group0  achieved=22.323Mbit/s +/- 0.409
+    dragonfly+  total=     14.298s +/- 0.272  intra=     12.840s +/- 0.148
+                FCT: mean=1.6936s p50=1.9044s p95=2.6206s max=4.6803s (n=19200 messages)
+                global_0_1    achieved=3.342Mbit/s +/- 0.044
+                local_group0  achieved=61.641Mbit/s +/- 0.812
+    speedup total: 0.890  significant=True   speedup intra-only: 0.865  significant=True
+
+  size=4M
+    dragonfly   total=     30.274s +/- 0.308  intra=     27.752s +/- 0.263
+                FCT: mean=4.6772s p50=4.8744s p95=6.6157s max=8.1579s (n=19200 messages)
+                global_0_1    achieved=7.514Mbit/s +/- 0.062
+                local_group0  achieved=46.212Mbit/s +/- 0.383
+    dragonfly+  total=     37.901s +/- 0.461  intra=     35.088s +/- 0.324
+                FCT: mean=6.4790s p50=7.3922s p95=10.1282s max=12.7843s (n=19200 messages)
+                global_0_1    achieved=6.228Mbit/s +/- 0.065
+                local_group0  achieved=114.613Mbit/s +/- 1.205
+    speedup total: 0.799  significant=True   speedup intra-only: 0.791  significant=True
+
+----------------------------------------------------------------------
+global_links_per_pair=2  bandwidth=10 Mbit/s
+----------------------------------------------------------------------
+  size=1M
+    dragonfly   total=     34.028s +/- 0.420  intra=     30.949s +/- 0.262
+                FCT: mean=5.7664s p50=6.2551s p95=7.1839s max=8.6513s (n=19200 messages)
+                global_0_1    achieved=1.743Mbit/s +/- 0.018
+                local_group0  achieved=10.498Mbit/s +/- 0.109
+    dragonfly+  total=     38.526s +/- 0.498  intra=     35.508s +/- 0.320
+                FCT: mean=6.6041s p50=7.6229s p95=9.3876s max=11.3651s (n=19200 messages)
+                global_0_1    achieved=1.527Mbit/s +/- 0.018
+                local_group0  achieved=27.543Mbit/s +/- 0.321
+    speedup total: 0.883  significant=True   speedup intra-only: 0.872  significant=True
+
+  size=4M
+    dragonfly   total=    110.594s +/- 1.258  intra=    101.851s +/- 1.238
+                FCT: mean=14.7056s p50=14.2976s p95=24.1485s max=29.0082s (n=19200 messages)
+                global_0_1    achieved=2.377Mbit/s +/- 0.021
+                local_group0  achieved=13.795Mbit/s +/- 0.085
+    dragonfly+  total=    143.738s +/- 1.950  intra=    135.054s +/- 1.901
+                FCT: mean=19.5854s p50=20.3376s p95=30.6436s max=47.4943s (n=19200 messages)
+                global_0_1    achieved=1.850Mbit/s +/- 0.020
+                local_group0  achieved=31.742Mbit/s +/- 0.099
+    speedup total: 0.769  significant=True   speedup intra-only: 0.754  significant=True
+
+----------------------------------------------------------------------
+global_links_per_pair=2  bandwidth=50 Mbit/s
+----------------------------------------------------------------------
+  size=1M
+    dragonfly   total=     12.730s +/- 0.279  intra=     10.956s +/- 0.148
+                FCT: mean=1.2546s p50=1.2610s p95=1.7905s max=3.3860s (n=19200 messages)
+                global_0_1    achieved=3.596Mbit/s +/- 0.052
+                local_group0  achieved=22.282Mbit/s +/- 0.323
+    dragonfly+  total=     14.370s +/- 0.339  intra=     12.879s +/- 0.173
+                FCT: mean=1.6960s p50=1.9057s p95=2.6302s max=4.5386s (n=19200 messages)
+                global_0_1    achieved=3.332Mbit/s +/- 0.055
+                local_group0  achieved=61.454Mbit/s +/- 1.013
+    speedup total: 0.886  significant=True   speedup intra-only: 0.851  significant=True
+
+  size=4M
+    dragonfly   total=     30.514s +/- 0.359  intra=     27.853s +/- 0.309
+                FCT: mean=4.6811s p50=4.8734s p95=6.6014s max=8.4661s (n=19200 messages)
+                global_0_1    achieved=7.403Mbit/s +/- 0.137
+                local_group0  achieved=45.922Mbit/s +/- 0.448
+    dragonfly+  total=     37.341s +/- 0.306  intra=     34.658s +/- 0.184
+                FCT: mean=6.4787s p50=7.3937s p95=10.1193s max=11.5586s (n=19200 messages)
+                global_0_1    achieved=6.305Mbit/s +/- 0.044
+                local_group0  achieved=116.085Mbit/s +/- 0.816
+    speedup total: 0.817  significant=True   speedup intra-only: 0.804  significant=True
+
+======================================================================
+SUMMARY (speedup = avg dragonfly / avg dragonfly+, >1 = DF+ faster)
+======================================================================
+    gl       bw   size    speedup   sig
+     1       10     1M      0.870  True
+     1       10     4M      0.776  True
+     1       50     1M      0.890  True
+     1       50     4M      0.799  True
+     2       10     1M      0.883  True
+     2       10     4M      0.769  True
+     2       50     1M      0.886  True
+     2       50     4M      0.817  True
+
+If global_links=1 and global_links=2 rows look statistically indistinguishable (overlapping CIs / similar speedups), that confirms the 'extra global links are inert for g-PAARD' claim; a consistent difference between them would contradict it and is worth a closer look.
+

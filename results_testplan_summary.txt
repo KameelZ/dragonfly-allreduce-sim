@@ -1,0 +1,41 @@
+DF_vs_DF_Plus_testplan.md -- full run summary
+======================================================================
+generated: 2026-10-07 09:06:26
+total wall-clock time: 730.0 minutes
+
+[OK] Section 5: resource-parity documentation (no root needed, seconds)
+    script: experiments/test_5_resource_parity.py
+    output: results_test5_resource_parity.txt
+    time:   0.4s
+
+[OK] Section 0: measurement-floor sanity check
+    script: experiments/test_0_sanity_identical.py
+    output: results_test0_sanity.txt
+    time:   501.6s
+
+[OK] Section 6: per-hop latency microbenchmark (ping-based)
+    script: experiments/test_6_latency_microbenchmark.py
+    output: results_test6_latency.txt
+    time:   291.1s
+
+[OK] Section 4: adversarial-pattern sweep (shift, nearest_neighbor)
+    script: experiments/test_4_adversarial_patterns.py
+    output: results_test4_adversarial.txt
+    time:   894.9s
+
+[OK] Section 1: paper-comparable sweep (headline result)
+    script: experiments/test_1_paper_comparable.py
+    output: results_test1_paper_comparable.txt
+    time:   6859.5s
+
+[OK] Section 2: scale sweep (groups 4/6/8)
+    script: experiments/test_2_scale_sweep.py
+    output: results_test2_scale.txt
+    time:   6551.0s
+
+[OK] Section 3: mechanism-isolating sweep + per-link utilization
+    script: experiments/test_3_mechanism_isolating.py
+    output: results_test3_mechanism.txt
+    time:   28680.6s
+
+All sections completed. Per DF_vs_DF_Plus_testplan.md's verification step: sanity-check results_test0_sanity.txt's speedup numbers land close to 1.0 with significant=False everywhere BEFORE trusting results_test1/2/3/4's numbers -- if test_0 shows a significant difference, the measurement pipeline itself is biased.

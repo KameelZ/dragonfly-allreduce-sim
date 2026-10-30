@@ -149,19 +149,24 @@ class DragonflyPlusTopo(Topo):
         global links connect each group pair.
         """
         next_spine = {g: 0 for g in range(self.num_groups)}
+        pairs = [(g1, g2) for g1 in range(self.num_groups)
+                for g2 in range(g1 + 1, self.num_groups)]
 
-        for g1 in range(self.num_groups):
-            for g2 in range(g1 + 1, self.num_groups):
-                for _ in range(self.global_links_per_pair):
-                    s1 = next_spine[g1] % self.spines_per_group[g1]
-                    s2 = next_spine[g2] % self.spines_per_group[g2]
-                    next_spine[g1] += 1
-                    next_spine[g2] += 1
+        # Same fix as DragonflyTopo._add_global_links: assign every pair's
+        # FIRST global link before any pair's redundant extras, so the
+        # round-robin can't wrap within one pair and collide with a
+        # different pair's primary spine (see that method's docstring).
+        for _ in range(self.global_links_per_pair):
+            for g1, g2 in pairs:
+                s1 = next_spine[g1] % self.spines_per_group[g1]
+                s2 = next_spine[g2] % self.spines_per_group[g2]
+                next_spine[g1] += 1
+                next_spine[g2] += 1
 
-                    sw1 = self.spine_map[(g1, s1)]
-                    sw2 = self.spine_map[(g2, s2)]
-                    self.addLink(sw1, sw2,
-                                 bw=self.link_bw, delay=self.link_delay)
+                sw1 = self.spine_map[(g1, s1)]
+                sw2 = self.spine_map[(g2, s2)]
+                self.addLink(sw1, sw2,
+                             bw=self.link_bw, delay=self.link_delay)
 
     def topology_label(self):
         """Short human-readable description of this topology's parameters,

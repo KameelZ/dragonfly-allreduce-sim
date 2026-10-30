@@ -1,0 +1,117 @@
+Section 4: adversarial-pattern sweep (shift, nearest_neighbor)
+======================================================================
+generated: 2026-10-08 00:42:42
+groups=4 width=4 hosts/router=2 (8 hosts/group) bw=100Mbit delay=1ms global_links=1
+message sizes: 4K, 64K, 1M
+patterns: shift, nearest_neighbor  repeat: 30
+
+[shift] Adversarial ring-shift traffic (see 'Adversarial traffic' above): every host in group g sends to the matching host in the next group over, so 100% of each group's egress bandwidth is forced onto the single global link connecting the two groups -- simultaneously, on every group-pair edge around the ring. Unlike hotspot, the bottleneck here is squarely on the *fabric*, not any one endpoint: it directly tests whether Dragonfly+'s extra spine-layer paths and leaf/spine link fan-out give it real headroom under a link that is *provably* the only route between two groups, or whether both topologies choke equally once shortest-path routing has no alternative to offer.
+
+[nearest_neighbor] Adversarial nearest-neighbor traffic (see 'Adversarial traffic' above): hosts are ordered round-robin across groups and each sends to its immediate successor, so an application pattern that *should* be nearly free (talk only to your neighbor) instead forces almost every message across a global link. This is worth testing because it is a realistic failure mode, not a synthetic worst case -- job placement that ignores the physical topology turns cheap stencil/ring communication into fabric-bound traffic, and this pattern measures exactly how expensive that placement mistake is on each topology.
+
+----------------------------------------------------------------------
+TOPOLOGY UNDER TEST: dragonfly   [adversarial_dragonfly_size4K]
+----------------------------------------------------------------------
+Dragonfly -- groups=4, routers/group=[4, 4, 4, 4], hosts/router=[2, 2, 2, 2], global=1
+switches=16 hosts=32 links=62 (host=32, local=24, global=6)
+[full topology plot saved to adversarial_topology_plots_v2/adversarial_dragonfly_size4K.png]
+
+----------------------------------------------------------------------
+TOPOLOGY UNDER TEST: dragonfly+   [adversarial_dragonflyplus_size4K]
+----------------------------------------------------------------------
+Dragonfly+ -- groups=4, leaves/group=[4, 4, 4, 4], spines/group=[4, 4, 4, 4], hosts/leaf=[2, 2, 2, 2], global=1
+switches=32 hosts=32 links=102 (host=32, local=64, global=6)
+[full topology plot saved to adversarial_topology_plots_v2/adversarial_dragonflyplus_size4K.png]
+
+----------------------------------------------------------------------
+TOPOLOGY UNDER TEST: dragonfly+   [adversarial_dragonflyplus_size64K]
+----------------------------------------------------------------------
+Dragonfly+ -- groups=4, leaves/group=[4, 4, 4, 4], spines/group=[4, 4, 4, 4], hosts/leaf=[2, 2, 2, 2], global=1
+switches=32 hosts=32 links=102 (host=32, local=64, global=6)
+[full topology plot saved to adversarial_topology_plots_v2/adversarial_dragonflyplus_size64K.png]
+
+----------------------------------------------------------------------
+TOPOLOGY UNDER TEST: dragonfly   [adversarial_dragonfly_size64K]
+----------------------------------------------------------------------
+Dragonfly -- groups=4, routers/group=[4, 4, 4, 4], hosts/router=[2, 2, 2, 2], global=1
+switches=16 hosts=32 links=62 (host=32, local=24, global=6)
+[full topology plot saved to adversarial_topology_plots_v2/adversarial_dragonfly_size64K.png]
+
+----------------------------------------------------------------------
+TOPOLOGY UNDER TEST: dragonfly   [adversarial_dragonfly_size1M]
+----------------------------------------------------------------------
+Dragonfly -- groups=4, routers/group=[4, 4, 4, 4], hosts/router=[2, 2, 2, 2], global=1
+switches=16 hosts=32 links=62 (host=32, local=24, global=6)
+[full topology plot saved to adversarial_topology_plots_v2/adversarial_dragonfly_size1M.png]
+
+----------------------------------------------------------------------
+TOPOLOGY UNDER TEST: dragonfly+   [adversarial_dragonflyplus_size1M]
+----------------------------------------------------------------------
+Dragonfly+ -- groups=4, leaves/group=[4, 4, 4, 4], spines/group=[4, 4, 4, 4], hosts/leaf=[2, 2, 2, 2], global=1
+switches=32 hosts=32 links=102 (host=32, local=64, global=6)
+[full topology plot saved to adversarial_topology_plots_v2/adversarial_dragonflyplus_size1M.png]
+
+======================================================================
+RESULTS: mean [95% CI], n=30. Only 'total' and FCT are meaningful here (no intra/inter split -- these patterns don't have g-PAARD's 6-step structure).
+======================================================================
+----------------------------------------------------------------------
+PATTERN: shift
+----------------------------------------------------------------------
+  dragonfly       4K  total=      1.214s +/- 0.002  FCT mean=0.2075s p95=1.0406s (n=960)
+                      global_0_1    achieved=0.354Mbit/s +/- 0.000
+                      local_group0  achieved=0.142Mbit/s +/- 0.000
+  dragonfly+      4K  total=      1.217s +/- 0.001  FCT mean=0.1982s p95=1.0408s (n=960)
+                      global_0_1    achieved=0.283Mbit/s +/- 0.000
+                      local_group0  achieved=0.071Mbit/s +/- 0.000
+    speedup (avg dragonfly / avg dragonfly+): 0.997  significant=True   <-- DF+ LOSES here
+  dragonfly      64K  total=      1.081s +/- 0.170  FCT mean=0.1283s p95=1.0568s (n=960)
+                      global_0_1    achieved=5.625Mbit/s +/- 0.614
+                      local_group0  achieved=2.257Mbit/s +/- 0.246
+  dragonfly+     64K  total=      1.189s +/- 0.168  FCT mean=0.1647s p95=1.0729s (n=960)
+                      global_0_1    achieved=4.211Mbit/s +/- 0.422
+                      local_group0  achieved=1.052Mbit/s +/- 0.106
+    speedup (avg dragonfly / avg dragonfly+): 0.909  significant=False
+  dragonfly       1M  total=      1.413s +/- 0.169  FCT mean=0.6004s p95=0.7509s (n=960)
+                      global_0_1    achieved=74.908Mbit/s +/- 5.519
+                      local_group0  achieved=30.138Mbit/s +/- 2.220
+  dragonfly+      1M  total=      1.496s +/- 0.178  FCT mean=0.7199s p95=0.7512s (n=960)
+                      global_0_1    achieved=58.063Mbit/s +/- 4.453
+                      local_group0  achieved=14.499Mbit/s +/- 1.112
+    speedup (avg dragonfly / avg dragonfly+): 0.944  significant=False
+
+----------------------------------------------------------------------
+PATTERN: nearest_neighbor
+----------------------------------------------------------------------
+  dragonfly       4K  total=      1.215s +/- 0.001  FCT mean=0.2076s p95=1.0408s (n=960)
+                      global_0_1    achieved=0.354Mbit/s +/- 0.000
+                      local_group0  achieved=0.142Mbit/s +/- 0.000
+  dragonfly+      4K  total=      1.217s +/- 0.001  FCT mean=0.2096s p95=1.0408s (n=960)
+                      global_0_1    achieved=0.283Mbit/s +/- 0.000
+                      local_group0  achieved=0.071Mbit/s +/- 0.000
+    speedup (avg dragonfly / avg dragonfly+): 0.998  significant=True   <-- DF+ LOSES here
+  dragonfly      64K  total=      1.171s +/- 0.094  FCT mean=0.1281s p95=1.0566s (n=960)
+                      global_0_1    achieved=5.150Mbit/s +/- 0.368
+                      local_group0  achieved=2.066Mbit/s +/- 0.147
+  dragonfly+     64K  total=      1.248s +/- 0.001  FCT mean=0.1706s p95=1.0728s (n=960)
+                      global_0_1    achieved=3.889Mbit/s +/- 0.005
+                      local_group0  achieved=0.972Mbit/s +/- 0.001
+    speedup (avg dragonfly / avg dragonfly+): 0.938  significant=False
+  dragonfly       1M  total=      1.474s +/- 0.149  FCT mean=0.5984s p95=0.7353s (n=960)
+                      global_0_1    achieved=72.479Mbit/s +/- 4.857
+                      local_group0  achieved=29.135Mbit/s +/- 1.952
+  dragonfly+      1M  total=      1.722s +/- 0.138  FCT mean=0.7510s p95=0.7354s (n=960)
+                      global_0_1    achieved=52.539Mbit/s +/- 3.495
+                      local_group0  achieved=13.121Mbit/s +/- 0.873
+    speedup (avg dragonfly / avg dragonfly+): 0.856  significant=False
+
+======================================================================
+SUMMARY (speedup = avg dragonfly / avg dragonfly+, >1 = DF+ faster, <1 = DF+ loses)
+======================================================================
+             pattern   size    speedup   sig
+               shift     4K      0.997  True
+               shift    64K      0.909 False
+               shift     1M      0.944 False
+    nearest_neighbor     4K      0.998  True
+    nearest_neighbor    64K      0.938 False
+    nearest_neighbor     1M      0.856 False
+

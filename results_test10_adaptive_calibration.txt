@@ -1,0 +1,144 @@
+Section 10: adaptive pattern selector -- calibration run (new sizes, bw=100Mbit)
+======================================================================
+generated: 2026-10-11 02:32:32
+groups=4 width=4 hosts/router=2 (8 hosts/group) bw=100Mbit delay=1ms global_links=1
+message sizes: 2M, 4M, 8M -- chosen to straddle the predicted ~6.3M crossover at bw=100Mbit (threshold_s=0.53)
+patterns: gpaard, gpaard_hierarchical  repeat: 20
+
+g-PAARD's own 6-step reduce-scatter + all-gather all-reduce schedule. This is the actual workload the routing in this project was built for, so it is the baseline every other pattern is judged against: if Dragonfly+ doesn't win here, the extra spine hardware isn't paying for itself on the workload that matters.
+
+Optimization idea #2: g-PAARD with steps 3/4's flat O(hosts^2) intra-group any-to-all replaced by a 2-level hierarchy -- combine within each leaf/router first (cheap, same cost in DF and DF+), then exchange among one representative per leaf only (the only part that crosses DF+'s expensive leaf-spine hop, now O(leaves^2) instead of O(hosts^2)), then broadcast back. test_7's spine-oversubscription triage showed hardware alone can't fix the gap (no ECMP in this project's routing); this targets the same contention by cutting message volume instead.
+
+Purpose: test_9_adaptive_selector.py's retrospective check found the selector's pick matches the empirically faster schedule at all 32 conditions already measured elsewhere, but none of those fell inside the uncalibrated gap between the known loss (bw=100Mbit/1M, 0.0839s) and the known win (bw=10Mbit/4M, 3.3554s). This run gets real data INSIDE that gap, to confirm or correct the threshold's placement rather than leave it as an unverified reasoned guess.
+
+----------------------------------------------------------------------
+TOPOLOGY UNDER TEST: dragonfly   [adaptive_calibration_dragonfly_size2M]
+----------------------------------------------------------------------
+Dragonfly -- groups=4, routers/group=[4, 4, 4, 4], hosts/router=[2, 2, 2, 2], global=1
+switches=16 hosts=32 links=62 (host=32, local=24, global=6)
+[full topology plot saved to adaptive_calibration_topology_plots/adaptive_calibration_dragonfly_size2M.png]
+
+----------------------------------------------------------------------
+TOPOLOGY UNDER TEST: dragonfly+   [adaptive_calibration_dragonflyplus_size2M]
+----------------------------------------------------------------------
+Dragonfly+ -- groups=4, leaves/group=[4, 4, 4, 4], spines/group=[4, 4, 4, 4], hosts/leaf=[2, 2, 2, 2], global=1
+switches=32 hosts=32 links=102 (host=32, local=64, global=6)
+[full topology plot saved to adaptive_calibration_topology_plots/adaptive_calibration_dragonflyplus_size2M.png]
+
+----------------------------------------------------------------------
+TOPOLOGY UNDER TEST: dragonfly+   [adaptive_calibration_dragonflyplus_size4M]
+----------------------------------------------------------------------
+Dragonfly+ -- groups=4, leaves/group=[4, 4, 4, 4], spines/group=[4, 4, 4, 4], hosts/leaf=[2, 2, 2, 2], global=1
+switches=32 hosts=32 links=102 (host=32, local=64, global=6)
+[full topology plot saved to adaptive_calibration_topology_plots/adaptive_calibration_dragonflyplus_size4M.png]
+
+----------------------------------------------------------------------
+TOPOLOGY UNDER TEST: dragonfly   [adaptive_calibration_dragonfly_size4M]
+----------------------------------------------------------------------
+Dragonfly -- groups=4, routers/group=[4, 4, 4, 4], hosts/router=[2, 2, 2, 2], global=1
+switches=16 hosts=32 links=62 (host=32, local=24, global=6)
+[full topology plot saved to adaptive_calibration_topology_plots/adaptive_calibration_dragonfly_size4M.png]
+
+----------------------------------------------------------------------
+TOPOLOGY UNDER TEST: dragonfly   [adaptive_calibration_dragonfly_size8M]
+----------------------------------------------------------------------
+Dragonfly -- groups=4, routers/group=[4, 4, 4, 4], hosts/router=[2, 2, 2, 2], global=1
+switches=16 hosts=32 links=62 (host=32, local=24, global=6)
+[full topology plot saved to adaptive_calibration_topology_plots/adaptive_calibration_dragonfly_size8M.png]
+
+----------------------------------------------------------------------
+TOPOLOGY UNDER TEST: dragonfly+   [adaptive_calibration_dragonflyplus_size8M]
+----------------------------------------------------------------------
+Dragonfly+ -- groups=4, leaves/group=[4, 4, 4, 4], spines/group=[4, 4, 4, 4], hosts/leaf=[2, 2, 2, 2], global=1
+switches=32 hosts=32 links=102 (host=32, local=64, global=6)
+[full topology plot saved to adaptive_calibration_topology_plots/adaptive_calibration_dragonflyplus_size8M.png]
+
+======================================================================
+RESULTS: mean [95% CI], n=20
+======================================================================
+----------------------------------------------------------------------
+size=2M  transfer_time_s=0.1678
+----------------------------------------------------------------------
+  dragonfly   gpaard              total=     12.794s +/- 0.453
+                                  FCT: mean=1.2601s p50=1.2457s p95=1.9301s max=3.7336s (n=12800 messages)
+                                  global_0_1    achieved=7.147Mbit/s +/- 0.166
+                                  local_group0  achieved=44.285Mbit/s +/- 1.034
+  dragonfly+  gpaard              total=     14.375s +/- 0.435
+                                  FCT: mean=1.7083s p50=1.9549s p95=2.7582s max=4.0157s (n=12800 messages)
+                                  global_0_1    achieved=6.602Mbit/s +/- 0.139
+                                  local_group0  achieved=122.577Mbit/s +/- 2.577
+  dragonfly   gpaard_hierarchical total=     14.439s +/- 0.548
+                                  FCT: mean=0.7150s p50=0.6189s p95=1.4052s max=2.4535s (n=7680 messages)
+                                  global_0_1    achieved=5.524Mbit/s +/- 0.126
+                                  local_group0  achieved=17.009Mbit/s +/- 0.391
+  dragonfly+  gpaard_hierarchical total=     14.831s +/- 0.555
+                                  FCT: mean=0.7384s p50=0.6209s p95=1.3172s max=2.3933s (n=7680 messages)
+                                  global_0_1    achieved=5.446Mbit/s +/- 0.119
+                                  local_group0  achieved=50.184Mbit/s +/- 1.096
+    dragonfly   predicted=gpaard              empirically_faster=gpaard              match=YES
+    dragonfly+  predicted=gpaard              empirically_faster=gpaard              match=YES
+  GAP flat  (dragonfly/dragonfly+, gpaard):              0.890  significant=True
+  GAP hier  (dragonfly/dragonfly+, gpaard_hierarchical): 0.974  significant=False
+
+----------------------------------------------------------------------
+size=4M  transfer_time_s=0.3355
+----------------------------------------------------------------------
+  dragonfly   gpaard              total=     18.809s +/- 0.474
+                                  FCT: mean=2.4064s p50=2.4371s p95=3.6053s max=5.0047s (n=12800 messages)
+                                  global_0_1    achieved=10.850Mbit/s +/- 0.200
+                                  local_group0  achieved=67.200Mbit/s +/- 1.241
+  dragonfly+  gpaard              total=     22.593s +/- 0.318
+                                  FCT: mean=3.3058s p50=3.7717s p95=5.3124s max=6.4991s (n=12800 messages)
+                                  global_0_1    achieved=9.431Mbit/s +/- 0.107
+                                  local_group0  achieved=175.053Mbit/s +/- 1.986
+  dragonfly   gpaard_hierarchical total=     18.156s +/- 0.638
+                                  FCT: mean=1.3342s p50=1.1960s p95=2.6783s max=3.8539s (n=7680 messages)
+                                  global_0_1    achieved=9.614Mbit/s +/- 0.215
+                                  local_group0  achieved=29.574Mbit/s +/- 0.668
+  dragonfly+  gpaard_hierarchical total=     18.196s +/- 0.629
+                                  FCT: mean=1.3668s p50=1.1823s p95=2.5696s max=3.6901s (n=7680 messages)
+                                  global_0_1    achieved=9.611Mbit/s +/- 0.230
+                                  local_group0  achieved=88.552Mbit/s +/- 2.119
+    dragonfly   predicted=gpaard              empirically_faster=gpaard_hierarchical match=NO
+    dragonfly+  predicted=gpaard              empirically_faster=gpaard_hierarchical match=NO
+  GAP flat  (dragonfly/dragonfly+, gpaard):              0.833  significant=True
+  GAP hier  (dragonfly/dragonfly+, gpaard_hierarchical): 0.998  significant=False
+
+----------------------------------------------------------------------
+size=8M  transfer_time_s=0.6711
+----------------------------------------------------------------------
+  dragonfly   gpaard              total=     31.560s +/- 0.411
+                                  FCT: mean=4.7253s p50=4.8320s p95=6.9756s max=8.7273s (n=12800 messages)
+                                  global_0_1    achieved=14.384Mbit/s +/- 0.156
+                                  local_group0  achieved=89.026Mbit/s +/- 0.970
+  dragonfly+  gpaard              total=     37.274s +/- 0.417
+                                  FCT: mean=6.3861s p50=7.4283s p95=9.9701s max=12.1160s (n=12800 messages)
+                                  global_0_1    achieved=12.496Mbit/s +/- 0.123
+                                  local_group0  achieved=232.090Mbit/s +/- 2.282
+  dragonfly   gpaard_hierarchical total=     27.583s +/- 0.729
+                                  FCT: mean=2.5581s p50=2.3200s p95=5.1949s max=6.8392s (n=7680 messages)
+                                  global_0_1    achieved=14.415Mbit/s +/- 0.276
+                                  local_group0  achieved=44.340Mbit/s +/- 0.840
+  dragonfly+  gpaard_hierarchical total=     26.678s +/- 0.635
+                                  FCT: mean=2.6258s p50=2.2899s p95=5.1037s max=6.4863s (n=7680 messages)
+                                  global_0_1    achieved=14.769Mbit/s +/- 0.255
+                                  local_group0  achieved=136.123Mbit/s +/- 2.344
+    dragonfly   predicted=gpaard_hierarchical empirically_faster=gpaard_hierarchical match=YES
+    dragonfly+  predicted=gpaard_hierarchical empirically_faster=gpaard_hierarchical match=YES
+  GAP flat  (dragonfly/dragonfly+, gpaard):              0.847  significant=True
+  GAP hier  (dragonfly/dragonfly+, gpaard_hierarchical): 1.034  significant=False
+
+======================================================================
+SUMMARY: does the selector's prediction match reality inside the previously-uncalibrated gap?
+======================================================================
+    size topology       flat_s    hier_s           predicted       actual_faster  match
+      2M dragonfly      12.794    14.439              gpaard              gpaard    YES
+      2M dragonfly+     14.375    14.831              gpaard              gpaard    YES
+      4M dragonfly      18.809    18.156              gpaard gpaard_hierarchical     NO
+      4M dragonfly+     22.593    18.196              gpaard gpaard_hierarchical     NO
+      8M dragonfly      31.560    27.583 gpaard_hierarchical gpaard_hierarchical    YES
+      8M dragonfly+     37.274    26.678 gpaard_hierarchical gpaard_hierarchical    YES
+
+4/6 predictions matched.
+2 mismatch(es) above: the threshold should move. Find the actual crossover size from where flat_s/hier_s cross over in the table above, recompute transfer_time_s at that point, and update benchmark_gpaard.ADAPTIVE_TRANSFER_TIME_THRESHOLD_S accordingly.
+

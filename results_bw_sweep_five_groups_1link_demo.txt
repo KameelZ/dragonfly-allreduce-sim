@@ -1,0 +1,55 @@
+g-PAARD bandwidth sweep -- config: five_groups_1link
+======================================================================
+generated: 2026-07-21 17:35:22
+groups=5 global_links_per_pair=1 (5 groups, 1 global link(s) per pair -- DF and DF+ diverge at >=4 groups in the global-exchange steps; extra global links do not help g-PAARD (single designated link + no ECMP))
+routers=2 leaves=2 spines=2 hosts=1 delay=1ms
+pattern: gpaard (only)
+bandwidths (Mbit/s): 10, 50
+message sizes: 4K
+repeat: 2
+
+----------------------------------------------------------------------
+TOPOLOGY UNDER TEST: dragonfly
+----------------------------------------------------------------------
+Dragonfly -- groups=5, routers/group=[2, 2, 2, 2, 2], hosts/router=[1, 1, 1, 1, 1], global=1
+switches=10 hosts=10 links=25 (host=10, local=5, global=10)
+[full topology plot saved to bandwidth_topology_plots/five_groups_1link_dragonfly.png]
+
+----------------------------------------------------------------------
+TOPOLOGY UNDER TEST: dragonfly+
+----------------------------------------------------------------------
+Dragonfly+ -- groups=5, leaves/group=[2, 2, 2, 2, 2], spines/group=[2, 2, 2, 2, 2], hosts/leaf=[1, 1, 1, 1, 1], global=1
+switches=20 hosts=10 links=40 (host=10, local=20, global=10)
+[full topology plot saved to bandwidth_topology_plots/five_groups_1link_dragonflyplus.png]
+
+======================================================================
+RESULTS: g-PAARD, grouped by BANDWIDTH then message size
+(every iteration, then the average, then speedup from the averages)
+======================================================================
+  g-PAARD's own 6-step reduce-scatter + all-gather all-reduce schedule. This
+  is the actual workload the routing in this project was built for, so it is
+  the baseline every other pattern is judged against: if Dragonfly+ doesn't
+  win here, the extra spine hardware isn't paying for itself on the workload
+  that matters.
+
+----------------------------------------------------------------------
+BANDWIDTH: 10 Mbit/s
+----------------------------------------------------------------------
+  dragonfly       4K: [iter1=5.277s, iter2=5.270s]  avg=5.273s
+  dragonfly+      4K: [iter1=7.294s, iter2=5.295s]  avg=6.294s
+  speedup (4K @ 10Mbit, avg dragonfly / avg dragonfly+): 0.838
+
+----------------------------------------------------------------------
+BANDWIDTH: 50 Mbit/s
+----------------------------------------------------------------------
+  dragonfly       4K: [iter1=6.274s, iter2=9.267s]  avg=7.771s
+  dragonfly+      4K: [iter1=7.280s, iter2=6.297s]  avg=6.789s
+  speedup (4K @ 50Mbit, avg dragonfly / avg dragonfly+): 1.145
+
+======================================================================
+SPEEDUP MATRIX (avg dragonfly / avg dragonfly+)  [>1 = DF+ faster]
+======================================================================
+  bw\size          4K
+       10       0.838
+       50       1.145
+

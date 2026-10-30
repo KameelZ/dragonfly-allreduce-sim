@@ -88,28 +88,63 @@ def group_hosts(topo):
 
 def _designated_global_switch(topo):
     """(g1, g2) -> the switch in group g1 carrying g-PAARD's designated
-    direct global link to group g2. Picks one deterministically (the first
-    found in sorted link order) when global_links_per_pair > 1 offers
-    several parallel links between the same two groups -- g-PAARD uses
-    exactly one direct hop per group pair, not all of them.
+    direct global link to group g2. chosen[(g1, g2)] and chosen[(g2, g1)]
+    always come from the SAME physical link (a real direct connection is
+    the whole point -- step 2 rides it), but when global_links_per_pair > 1
+    offers several parallel candidate links between the same two groups,
+    prefers whichever candidate link has BOTH ends not already designated
+    for one of its group's other remote-group pairs, so each group's
+    collectors spread across distinct routers/spines instead of piling two
+    remote groups onto one host.
+
+    An earlier version of this picked each direction independently
+    (g1's and g2's preferred candidate separately), which could pick two
+    DIFFERENT physical links for the two directions of the same pair --
+    breaking the "step 2 rides a real direct link" invariant (caught by
+    verify_gpaard_correctness.py's structural check). Picking one link per
+    pair and committing both of its ends together is what keeps that
+    invariant while still load-balancing.
     """
     switch_group = _switch_group_map(topo)
-    chosen = {}
-    for n1, n2 in sorted(topo.links()):
+
+    # Collect every candidate link per unordered group pair, each as the
+    # (switch_in_lower_group, switch_in_higher_group) tuple -- canonicalized
+    # by group id so both ends of one physical link travel together.
+    pair_links = {}
+    for n1, n2 in topo.links():
         if n1 not in switch_group or n2 not in switch_group:
             continue  # a host link, not a switch-switch link
         g1, g2 = switch_group[n1], switch_group[n2]
         if g1 == g2:
             continue  # a local (intra-group) link, not global
-        chosen.setdefault((g1, g2), n1)
-        chosen.setdefault((g2, g1), n2)
+        key, link = (g1, g2), (n1, n2)
+        if g1 > g2:
+            key, link = (g2, g1), (n2, n1)
+        pair_links.setdefault(key, []).append(link)
 
-    missing = [(g1, g2) for g1 in range(topo.num_groups) for g2 in range(topo.num_groups)
-               if g1 != g2 and (g1, g2) not in chosen]
+    missing = [(g1, g2) for g1 in range(topo.num_groups) for g2 in range(g1 + 1, topo.num_groups)
+               if (g1, g2) not in pair_links]
     if missing:
         raise ValueError(
             "g-PAARD requires a direct global link between every pair of groups "
             f"(canonical Dragonfly guarantees this); missing pairs: {missing}")
+
+    chosen = {}
+    used_by_group = {g: set() for g in range(topo.num_groups)}
+    for g_lo in range(topo.num_groups):
+        for g_hi in range(g_lo + 1, topo.num_groups):
+            links = pair_links[(g_lo, g_hi)]
+            # Prefer a link free on BOTH ends; failing that, free on g_lo's
+            # end; failing that, just the first candidate (unavoidable once
+            # a group has more remote pairs than routers/spines).
+            pick = (next((lk for lk in links
+                        if lk[0] not in used_by_group[g_lo] and lk[1] not in used_by_group[g_hi]), None)
+                   or next((lk for lk in links if lk[0] not in used_by_group[g_lo]), links[0]))
+            sw_lo, sw_hi = pick
+            chosen[(g_lo, g_hi)] = sw_lo
+            chosen[(g_hi, g_lo)] = sw_hi
+            used_by_group[g_lo].add(sw_lo)
+            used_by_group[g_hi].add(sw_hi)
     return chosen
 
 
@@ -226,8 +261,147 @@ def build_gpaard_schedule(topo):
     return {"reduce_scatter": reduce_scatter, "all_gather": all_gather}
 
 
-def simulate_allreduce(topo):
-    """Pure-Python correctness check for the g-PAARD schedule.
+def _leaves_by_group(topo):
+    """group_id -> list of (switch_id, sorted_host_list), one entry per
+    leaf/router in that group, sorted by switch_id. Works identically for
+    DragonflyTopo (switch_id = router_id) and DragonflyPlusTopo (switch_id
+    = leaf_id) -- both store host_map[host] = (group_id, switch_id, host_id)
+    with the same shape, so no topology-specific branching is needed.
+    """
+    by_group_leaf = {}
+    for host_name, (group_id, switch_id, _host_id) in topo.host_map.items():
+        by_group_leaf.setdefault(group_id, {}).setdefault(switch_id, []).append(host_name)
+    return {
+        group_id: [(switch_id, sorted(hosts)) for switch_id, hosts in sorted(by_leaf.items())]
+        for group_id, by_leaf in by_group_leaf.items()
+    }
+
+
+def _hierarchical_full_exchange(hosts_by_leaf, shard):
+    """Replacement for a flat full any-to-all among one group's hosts for
+    `shard`: after running combine, THEN exchange, THEN broadcast (in that
+    order -- each depends on the previous one's result, they are NOT one
+    simultaneous step), every host ends up holding the union of every other
+    host's PRE-CALL knowledge for `shard` -- the same end-state guarantee a
+    flat O(hosts^2) any-to-all gives, using far fewer of the messages that
+    cross a leaf boundary (DF+'s expensive leaf-spine hop; DF has no
+    cheap/expensive distinction between routers, but still sends fewer
+    total messages, reducing contention).
+
+    hosts_by_leaf: this group's (switch_id, sorted_host_list) list, from
+    _leaves_by_group(topo)[group_id].
+
+    Returns (combine_messages, exchange_messages, broadcast_messages).
+    Each leaf's first host (deterministic, since hosts_by_leaf's lists are
+    pre-sorted) acts as that leaf's representative for the exchange level.
+    """
+    combine = []
+    representatives = []
+    for _switch_id, hosts in hosts_by_leaf:
+        representatives.append(hosts[0])
+        for src in hosts:
+            for dst in hosts:
+                if src != dst:
+                    combine.append((src, dst, shard))
+
+    exchange = []
+    for src in representatives:
+        for dst in representatives:
+            if src != dst:
+                exchange.append((src, dst, shard))
+
+    broadcast = []
+    for _switch_id, hosts in hosts_by_leaf:
+        rep = hosts[0]
+        for other in hosts[1:]:
+            broadcast.append((rep, other, shard))
+
+    return combine, exchange, broadcast
+
+
+def build_gpaard_hierarchical_schedule(topo):
+    """Optimization idea #2 from DF_vs_DF_Plus_testplan.md: like
+    build_gpaard_schedule, but replaces the flat O(hosts^2) intra-group
+    any-to-all in steps 3/4 with a 2-level hierarchy (combine within each
+    leaf/router, exchange among one representative per leaf, broadcast
+    back) via _hierarchical_full_exchange. Steps 1/2/5/6 are UNCHANGED from
+    build_gpaard_schedule -- they're already only O(hosts) (fan-in/out to
+    one collector), not worth restructuring.
+
+    Returns the same {"reduce_scatter": [...], "all_gather": [...]} shape,
+    just with more, individually cheaper, steps inside it: reduce_scatter
+    is [step1, step2, combine, exchange, broadcast] (5 steps, was 3);
+    all_gather is [combine, exchange, broadcast, step5, step6] (5 steps,
+    was 3) -- the all_gather trio is a FRESH call to the same generator,
+    not a literal reversal of reduce_scatter's trio (see note below).
+
+    Why calling the generator again, not reversing step3's hierarchy: a
+    flat full any-to-all is its own mirror image under src/dst reversal
+    (for every (A,B) it already contains (B,A)), which is why the ORIGINAL
+    schedule's step4 = reverse(step3) ends up being the exact same
+    multiset of messages -- but my 3-level hierarchy is NOT self-mirroring
+    (level 3, representative -> leaf-mates, is a fan-out, not a symmetric
+    any-to-all), so "reverse the hierarchy" isn't well-defined the same
+    way. Calling the generator again instead is correct regardless: after
+    reduce_scatter's hierarchy completes, every host in a group already
+    holds the full union for its shard (same guarantee as the original
+    flat step3), so all_gather's hierarchy -- processed via
+    simulate_allreduce's apply_broadcast (overwrite, not union) -- only
+    ever overwrites a host's value with an ALREADY-IDENTICAL value from
+    another host, a safe no-op. This mirrors the original design's own
+    property (its step3/step4 pair is redundant in the same sense) rather
+    than introducing a new one.
+    """
+    num_groups = topo.num_groups
+    groups = group_hosts(topo)
+    role_host = designate_roles(topo)
+    leaves_by_group = _leaves_by_group(topo)
+
+    # Step 1 (unchanged from build_gpaard_schedule).
+    step1 = []
+    for g in range(num_groups):
+        for j in range(num_groups):
+            if j == g:
+                continue
+            collector = role_host[(g, j)]
+            for host in groups[g]:
+                if host != collector:
+                    step1.append((host, collector, j))
+
+    # Step 2 (unchanged from build_gpaard_schedule).
+    step2 = []
+    seen_pairs = set()
+    for g1 in range(num_groups):
+        for g2 in range(num_groups):
+            if g1 == g2 or frozenset((g1, g2)) in seen_pairs:
+                continue
+            seen_pairs.add(frozenset((g1, g2)))
+            step2.append((role_host[(g1, g2)], role_host[(g2, g1)], g2))
+            step2.append((role_host[(g2, g1)], role_host[(g1, g2)], g1))
+
+    def _hierarchical_trio():
+        combine_step, exchange_step, broadcast_step = [], [], []
+        for g in range(num_groups):
+            c, e, b = _hierarchical_full_exchange(leaves_by_group[g], g)
+            combine_step.extend(c)
+            exchange_step.extend(e)
+            broadcast_step.extend(b)
+        return [combine_step, exchange_step, broadcast_step]
+
+    reduce_scatter = [step1, step2] + _hierarchical_trio()
+    all_gather = _hierarchical_trio() + [
+        [(dst, src, shard) for (src, dst, shard) in step2],
+        [(dst, src, shard) for (src, dst, shard) in step1],
+    ]
+
+    return {"reduce_scatter": reduce_scatter, "all_gather": all_gather}
+
+
+def simulate_allreduce(topo, schedule_fn=build_gpaard_schedule):
+    """Pure-Python correctness check for a g-PAARD schedule. `schedule_fn`
+    defaults to the original build_gpaard_schedule; pass
+    build_gpaard_hierarchical_schedule to check the optimization idea #2
+    variant instead -- same correctness bar, different message schedule.
 
     Each host's per-shard data is represented as a frozenset of contributor
     host names (provenance tracking) instead of real numbers -- a message
@@ -239,7 +413,7 @@ def simulate_allreduce(topo):
 
     Returns the final {host: {shard: frozenset(contributors)}} state.
     """
-    schedule = build_gpaard_schedule(topo)
+    schedule = schedule_fn(topo)
     groups = group_hosts(topo)
     num_groups = topo.num_groups
     all_hosts = [h for hosts in groups.values() for h in hosts]

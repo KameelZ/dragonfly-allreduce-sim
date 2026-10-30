@@ -1,0 +1,31 @@
+run_tonight.py -- full hierarchical-vs-flat evidence trail (test_8, test_1, test_2, test_10, test_9)
+======================================================================
+generated: 2026-10-11 04:33:10
+total wall-clock time: 912.6 minutes
+
+[OK] Idea #2 headline: worst-case condition, gpaard vs gpaard_hierarchical
+    script: experiments/test_8_hierarchical_pattern.py
+    output: results_test8_hierarchical_pattern.txt
+    time:   14934.6s
+
+[OK] Section 1 + idea #2: gpaard vs gpaard_hierarchical across the full size sweep
+    script: experiments/test_1_paper_comparable.py
+    output: results_test1_paper_comparable.txt
+    time:   17419.4s
+
+[OK] Section 2 + idea #2: gpaard vs gpaard_hierarchical across groups=4/6/8
+    script: experiments/test_2_scale_sweep.py
+    output: results_test2_scale.txt
+    time:   15157.7s
+
+[FAILED (exit 1)] Adaptive selector calibration: real data inside the uncalibrated threshold gap
+    script: experiments/test_10_adaptive_calibration.py
+    output: results_test10_adaptive_calibration.txt
+    time:   7233.6s
+
+[FAILED (exit 1)] Adaptive selector retrospective validation (no root needed, runs last on purpose)
+    script: experiments/test_9_adaptive_selector.py
+    output: results_test9_adaptive_selector.txt
+    time:   0.0s
+
+2/5 section(s) did not complete cleanly -- check that section's own stdout (scroll back) for the actual error before trusting any adjacent result file.

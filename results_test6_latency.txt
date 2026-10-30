@@ -1,0 +1,126 @@
+Section 6: per-hop latency microbenchmark (ping-based RTT, no iperf/TCP)
+======================================================================
+generated: 2026-10-06 21:04:56
+groups swept: [4, 6, 8]  width=4 hosts/router=2 (8 hosts/group) bw=100Mbit delay=1ms global_links=1
+ping count per pair: 150  interval: 0.01s
+
+(a) same_switch: 2 links (host-switch-host) either topology -- expect ratio ~1.0.
+(b) diff_switch_same_group: THE core structural claim -- DF is 3 links (host-switch1-switch2-host), DF+ is 4 (host-leaf1-spine-leaf2-host) -- expect ratio = 4/3 ~ 1.333.
+(c) cross_group_designated: g-PAARD's actual step-2 host pair. NOT a control -- DF+'s designated host is a leaf, and global links only attach to spines, so it pays a leaf-spine hop on EACH end: DF is 3 links (host-switch-[global]-switch-host), DF+ is 5 (host-leaf-spine-[global]-spine-leaf-host) -- expect ratio = 5/3 ~ 1.667.
+Hop counts are structural, not scale-dependent -- these ratios should hold at every group count swept below.
+
+----------------------------------------------------------------------
+TOPOLOGY UNDER TEST: dragonfly   [latency_groups4_dragonfly]
+----------------------------------------------------------------------
+Dragonfly -- groups=4, routers/group=[4, 4, 4, 4], hosts/router=[2, 2, 2, 2], global=1
+switches=16 hosts=32 links=62 (host=32, local=24, global=6)
+[full topology plot saved to latency_topology_plots/latency_groups4_dragonfly.png]
+
+----------------------------------------------------------------------
+TOPOLOGY UNDER TEST: dragonfly+   [latency_groups4_dragonflyplus]
+----------------------------------------------------------------------
+Dragonfly+ -- groups=4, leaves/group=[4, 4, 4, 4], spines/group=[4, 4, 4, 4], hosts/leaf=[2, 2, 2, 2], global=1
+switches=32 hosts=32 links=102 (host=32, local=64, global=6)
+[full topology plot saved to latency_topology_plots/latency_groups4_dragonflyplus.png]
+
+----------------------------------------------------------------------
+TOPOLOGY UNDER TEST: dragonfly   [latency_groups6_dragonfly]
+----------------------------------------------------------------------
+Dragonfly -- groups=6, routers/group=[4, 4, 4, 4, 4, 4], hosts/router=[2, 2, 2, 2, 2, 2], global=1
+switches=24 hosts=48 links=99 (host=48, local=36, global=15)
+[full topology plot saved to latency_topology_plots/latency_groups6_dragonfly.png]
+
+----------------------------------------------------------------------
+TOPOLOGY UNDER TEST: dragonfly+   [latency_groups6_dragonflyplus]
+----------------------------------------------------------------------
+Dragonfly+ -- groups=6, leaves/group=[4, 4, 4, 4, 4, 4], spines/group=[4, 4, 4, 4, 4, 4], hosts/leaf=[2, 2, 2, 2, 2, 2], global=1
+switches=48 hosts=48 links=159 (host=48, local=96, global=15)
+[full topology plot saved to latency_topology_plots/latency_groups6_dragonflyplus.png]
+
+----------------------------------------------------------------------
+TOPOLOGY UNDER TEST: dragonfly   [latency_groups8_dragonfly]
+----------------------------------------------------------------------
+Dragonfly -- groups=8, routers/group=[4, 4, 4, 4, 4, 4, 4, 4], hosts/router=[2, 2, 2, 2, 2, 2, 2, 2], global=1
+switches=32 hosts=64 links=140 (host=64, local=48, global=28)
+[full topology plot saved to latency_topology_plots/latency_groups8_dragonfly.png]
+
+----------------------------------------------------------------------
+TOPOLOGY UNDER TEST: dragonfly+   [latency_groups8_dragonflyplus]
+----------------------------------------------------------------------
+Dragonfly+ -- groups=8, leaves/group=[4, 4, 4, 4, 4, 4, 4, 4], spines/group=[4, 4, 4, 4, 4, 4, 4, 4], hosts/leaf=[2, 2, 2, 2, 2, 2, 2, 2], global=1
+switches=64 hosts=64 links=220 (host=64, local=128, global=28)
+[full topology plot saved to latency_topology_plots/latency_groups8_dragonflyplus.png]
+
+======================================================================
+RESULTS: ping RTT min/avg/max/mdev (ms), from the ping utility's own summary
+======================================================================
+----------------------------------------------------------------------
+groups=4
+----------------------------------------------------------------------
+  CASE: same_switch  (expected ratio ~1.000)
+    dragonfly   h0_0_0->h0_0_1  min=4.025ms avg=4.028ms max=4.046ms mdev=0.002ms  loss=0.0%  (n=150)
+    dragonfly+  h0_0_0->h0_0_1  min=4.025ms avg=4.028ms max=4.044ms mdev=0.002ms  loss=0.0%  (n=150)
+    DF+/DF avg RTT ratio: 1.000  (expected ~1.000)
+
+  CASE: diff_switch_same_group  (expected ratio ~1.333)
+    dragonfly   h0_0_0->h0_1_0  min=6.037ms avg=6.039ms max=6.086ms mdev=0.005ms  loss=0.0%  (n=150)
+    dragonfly+  h0_0_0->h0_1_0  min=8.049ms avg=8.057ms max=8.603ms mdev=0.045ms  loss=0.0%  (n=150)
+    DF+/DF avg RTT ratio: 1.334  (expected ~1.333)
+
+  CASE: cross_group_designated  (expected ratio ~1.667)
+    dragonfly   h0_0_0->h1_0_0  min=6.036ms avg=6.038ms max=6.060ms mdev=0.003ms  loss=0.0%  (n=150)
+    dragonfly+  h0_0_0->h1_0_0  min=10.061ms avg=10.088ms max=10.757ms mdev=0.058ms  loss=0.0%  (n=150)
+    DF+/DF avg RTT ratio: 1.671  (expected ~1.667)
+
+----------------------------------------------------------------------
+groups=6
+----------------------------------------------------------------------
+  CASE: same_switch  (expected ratio ~1.000)
+    dragonfly   h0_0_0->h0_0_1  min=4.025ms avg=4.032ms max=4.301ms mdev=0.025ms  loss=0.0%  (n=150)
+    dragonfly+  h0_0_0->h0_0_1  min=4.025ms avg=4.029ms max=4.453ms mdev=0.034ms  loss=0.0%  (n=150)
+    DF+/DF avg RTT ratio: 0.999  (expected ~1.000)
+
+  CASE: diff_switch_same_group  (expected ratio ~1.333)
+    dragonfly   h0_0_0->h0_1_0  min=6.037ms avg=6.043ms max=6.395ms mdev=0.030ms  loss=0.0%  (n=150)
+    dragonfly+  h0_0_0->h0_1_0  min=8.048ms avg=8.057ms max=8.568ms mdev=0.044ms  loss=0.0%  (n=150)
+    DF+/DF avg RTT ratio: 1.333  (expected ~1.333)
+
+  CASE: cross_group_designated  (expected ratio ~1.667)
+    dragonfly   h0_0_0->h1_0_0  min=6.035ms avg=6.042ms max=6.415ms mdev=0.031ms  loss=0.0%  (n=150)
+    dragonfly+  h0_0_0->h1_0_0  min=10.059ms avg=10.087ms max=10.771ms mdev=0.058ms  loss=0.0%  (n=150)
+    DF+/DF avg RTT ratio: 1.669  (expected ~1.667)
+
+----------------------------------------------------------------------
+groups=8
+----------------------------------------------------------------------
+  CASE: same_switch  (expected ratio ~1.000)
+    dragonfly   h0_0_0->h0_0_1  min=4.025ms avg=4.032ms max=4.392ms mdev=0.031ms  loss=0.0%  (n=150)
+    dragonfly+  h0_0_0->h0_0_1  min=4.024ms avg=4.030ms max=4.529ms mdev=0.041ms  loss=0.0%  (n=150)
+    DF+/DF avg RTT ratio: 1.000  (expected ~1.000)
+
+  CASE: diff_switch_same_group  (expected ratio ~1.333)
+    dragonfly   h0_0_0->h0_1_0  min=6.036ms avg=6.042ms max=6.538ms mdev=0.040ms  loss=0.0%  (n=150)
+    dragonfly+  h0_0_0->h0_1_0  min=8.048ms avg=8.056ms max=8.666ms mdev=0.050ms  loss=0.0%  (n=150)
+    DF+/DF avg RTT ratio: 1.333  (expected ~1.333)
+
+  CASE: cross_group_designated  (expected ratio ~1.667)
+    dragonfly   h0_0_0->h1_0_0  min=6.036ms avg=6.041ms max=6.532ms mdev=0.040ms  loss=0.0%  (n=150)
+    dragonfly+  h0_0_0->h1_0_0  min=10.060ms avg=10.085ms max=10.692ms mdev=0.054ms  loss=0.0%  (n=150)
+    DF+/DF avg RTT ratio: 1.669  (expected ~1.667)
+
+======================================================================
+SUMMARY: measured vs expected DF+/DF ratio, across every group count swept
+======================================================================
+    groups                     case   measured   expected
+         4              same_switch      1.000      1.000
+         4   diff_switch_same_group      1.334      1.333
+         4   cross_group_designated      1.671      1.667
+         6              same_switch      0.999      1.000
+         6   diff_switch_same_group      1.333      1.333
+         6   cross_group_designated      1.669      1.667
+         8              same_switch      1.000      1.000
+         8   diff_switch_same_group      1.333      1.333
+         8   cross_group_designated      1.669      1.667
+
+If measured stays close to expected across every groups row for a case, that confirms the ratio is a structural (hop-count) property, not an artifact of one particular scale.
+

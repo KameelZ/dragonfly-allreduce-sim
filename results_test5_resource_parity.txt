@@ -1,0 +1,48 @@
+Section 5: resource-parity documentation
+======================================================================
+generated: 2026-10-06 20:56:29
+
+Course spec requirement: DF/DF+ builds should use 'roughly equal resources -- matched switch count, aggregated bandwidth, and link count; differences must be documented.'
+
+Design decision: DF+ here always uses spines_per_group == leaves_per_group (the standard Dragonfly+ full bipartite leaf-spine fabric). We deliberately do NOT shrink DF+'s spine count to force switch-count parity with DF -- a single spine would funnel all intra-group traffic through one switch, which is a congestion confound worse than the resource-count delta documented below.
+
+(aggregate bandwidth uses an illustrative reference bw=100 Mbit/s per link -- every link in this project shares one bw value, so the RATIO below is what matters, not the absolute number)
+
+config                                        topology    switches  hosts  links  (host/local/global) agg_bw(Mbit)
+----------------------------------------------------------------------------------------------------------------------------------
+groups=2,width=4,hosts=2,gl=1                 dragonfly          8     16     29            (16/12/1)         2900
+groups=2,width=4,hosts=2,gl=1                 dragonfly+        16     16     49            (16/32/1)         4900
+                                              -- used by: test_0 switch_ratio(DF+/DF)=2.00  link_ratio(DF+/DF)=1.69
+
+groups=3,width=4,hosts=2,gl=1                 dragonfly         12     24     45            (24/18/3)         4500
+groups=3,width=4,hosts=2,gl=1                 dragonfly+        24     24     75            (24/48/3)         7500
+                                              -- used by: test_0 switch_ratio(DF+/DF)=2.00  link_ratio(DF+/DF)=1.67
+
+groups=4,width=4,hosts=2,gl=1                 dragonfly         16     32     62            (32/24/6)         6200
+groups=4,width=4,hosts=2,gl=1                 dragonfly+        32     32    102            (32/64/6)        10200
+                                              -- used by: test_1, test_4 switch_ratio(DF+/DF)=2.00  link_ratio(DF+/DF)=1.65
+
+groups=6,width=4,hosts=2,gl=1                 dragonfly         24     48     99           (48/36/15)         9900
+groups=6,width=4,hosts=2,gl=1                 dragonfly+        48     48    159           (48/96/15)        15900
+                                              -- used by: test_2 switch_ratio(DF+/DF)=2.00  link_ratio(DF+/DF)=1.61
+
+groups=8,width=4,hosts=2,gl=1                 dragonfly         32     64    140           (64/48/28)        14000
+groups=8,width=4,hosts=2,gl=1                 dragonfly+        64     64    220          (64/128/28)        22000
+                                              -- used by: test_2 switch_ratio(DF+/DF)=2.00  link_ratio(DF+/DF)=1.57
+
+groups=4,width=4,hosts=2,gl=2                 dragonfly         16     32     68           (32/24/12)         6800
+groups=4,width=4,hosts=2,gl=2                 dragonfly+        32     32    108           (32/64/12)        10800
+                                              -- used by: test_3 (global_links=2 variant) switch_ratio(DF+/DF)=2.00  link_ratio(DF+/DF)=1.59
+
+======================================================================
+SUMMARY: DF+/DF switch-count and link-count ratios across every config
+======================================================================
+  groups=2,width=4,hosts=2,gl=1       switches x2.00  links x1.69  (used by: test_0)
+  groups=3,width=4,hosts=2,gl=1       switches x2.00  links x1.67  (used by: test_0)
+  groups=4,width=4,hosts=2,gl=1       switches x2.00  links x1.65  (used by: test_1, test_4)
+  groups=6,width=4,hosts=2,gl=1       switches x2.00  links x1.61  (used by: test_2)
+  groups=8,width=4,hosts=2,gl=1       switches x2.00  links x1.57  (used by: test_2)
+  groups=4,width=4,hosts=2,gl=2       switches x2.00  links x1.59  (used by: test_3 (global_links=2 variant))
+
+Average switch-count ratio across all configs: x2.00 -- this is the resource delta that must be stated alongside every DF-vs-DF+ performance number in the final report.
+
