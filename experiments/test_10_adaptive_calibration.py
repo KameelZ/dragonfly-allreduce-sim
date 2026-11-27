@@ -73,8 +73,8 @@ DELAY = "1ms"
 GLOBAL_LINKS = 1
 SETTLE = 1
 TIMEOUT = 120  # bumped from test_1's 60: these sizes are up to 8x test_1's largest
-PLOTS_DIR = "adaptive_calibration_topology_plots"
-OUT_PATH = "results_test10_adaptive_calibration.txt"
+PLOTS_DIR = "plots/adaptive_calibration_topology_plots"
+OUT_PATH = "results/results_test10_adaptive_calibration.txt"
 
 PATTERNS_TO_TEST = ["gpaard", "gpaard_hierarchical"]
 

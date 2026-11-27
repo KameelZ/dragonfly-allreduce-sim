@@ -62,8 +62,8 @@ REPEAT = 30
 DELAY = "1ms"
 SETTLE = 1
 TIMEOUT = 60
-PLOTS_DIR = "hierarchical_plus_multipath_topology_plots"
-OUT_PATH = "results_test12_hierarchical_plus_multipath.txt"
+PLOTS_DIR = "plots/hierarchical_plus_multipath_topology_plots"
+OUT_PATH = "results/results_test12_hierarchical_plus_multipath.txt"
 
 # Same 4-variant dose-response design as test_7/test_11, pattern swapped to
 # gpaard_hierarchical -- the only difference from test_11.

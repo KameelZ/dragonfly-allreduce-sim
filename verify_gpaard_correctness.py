@@ -277,7 +277,7 @@ def main():
     results = [run_case(name, topo) for name, topo in all_cases]
     report = build_report(results, len(curated), len(randomized))
 
-    report_path = "gpaard_correctness_report.txt"
+    report_path = "results/gpaard_correctness_report.txt"
     with open(report_path, "w") as f:
         f.write(report)
 
@@ -288,7 +288,7 @@ def main():
         detail_lines.extend(dump_full_schedule(name, topo))
     detail_report = "\n".join(detail_lines) + "\n"
 
-    detail_path = "gpaard_small_case_detail.txt"
+    detail_path = "results/gpaard_small_case_detail.txt"
     with open(detail_path, "w") as f:
         f.write(detail_report)
 

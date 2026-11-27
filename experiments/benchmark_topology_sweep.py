@@ -247,10 +247,10 @@ def parse_args(argv=None):
     parser.add_argument("--settle", type=int, default=1, help="seconds to wait after installing flows (default: 1)")
     parser.add_argument("--repeat", type=int, default=3, help="iterations per (pattern, size) (default: 3)")
     parser.add_argument("--timeout", type=int, default=60, help="per-message iperf timeout in seconds (default: 60)")
-    parser.add_argument("--out-prefix", type=str, default="results_adversarial",
-                        help="result files are written to <prefix>_<config>.txt (default: results_adversarial)")
-    parser.add_argument("--plots-dir", type=str, default="adversarial_topology_plots",
-                        help="directory for the topology plot images (default: adversarial_topology_plots)")
+    parser.add_argument("--out-prefix", type=str, default="results/early/results_adversarial",
+                        help="result files are written to <prefix>_<config>.txt (default: results/early/results_adversarial)")
+    parser.add_argument("--plots-dir", type=str, default="plots/adversarial_topology_plots",
+                        help="directory for the topology plot images (default: plots/adversarial_topology_plots)")
     args = parser.parse_args(argv)
 
     args.patterns = [p.strip() for p in args.patterns.split(",") if p.strip()]

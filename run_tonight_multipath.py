@@ -49,13 +49,13 @@ sys.path.insert(0, PROJECT_ROOT)
 from run_full_testplan import hygiene, run_section, write_summary
 
 SECTIONS = [
-    ("experiments/test_11_multipath_spines.py", "results_test11_multipath_spines.txt",
+    ("experiments/test_11_multipath_spines.py", "results/results_test11_multipath_spines.txt",
      "Idea #5: ECMP multipath across spines, flat gpaard, same condition as test_7"),
-    ("experiments/test_12_hierarchical_plus_multipath.py", "results_test12_hierarchical_plus_multipath.txt",
+    ("experiments/test_12_hierarchical_plus_multipath.py", "results/results_test12_hierarchical_plus_multipath.txt",
      "Idea #6: idea #2 (hierarchical) + idea #5 (multipath) combined"),
 ]
 
-SUMMARY_PATH = os.path.join(PROJECT_ROOT, "results_tonight_multipath_summary.txt")
+SUMMARY_PATH = os.path.join(PROJECT_ROOT, "results/results_tonight_multipath_summary.txt")
 
 
 def main():

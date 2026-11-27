@@ -56,19 +56,19 @@ from run_full_testplan import hygiene, run_section, write_summary
 # Order matters: test_9 must run LAST since it parses the result files the
 # other four sections write -- running it earlier would read stale data.
 SECTIONS = [
-    ("experiments/test_8_hierarchical_pattern.py", "results_test8_hierarchical_pattern.txt",
+    ("experiments/test_8_hierarchical_pattern.py", "results/results_test8_hierarchical_pattern.txt",
      "Idea #2 headline: worst-case condition, gpaard vs gpaard_hierarchical"),
-    ("experiments/test_1_paper_comparable.py", "results_test1_paper_comparable.txt",
+    ("experiments/test_1_paper_comparable.py", "results/results_test1_paper_comparable.txt",
      "Section 1 + idea #2: gpaard vs gpaard_hierarchical across the full size sweep"),
-    ("experiments/test_2_scale_sweep.py", "results_test2_scale.txt",
+    ("experiments/test_2_scale_sweep.py", "results/results_test2_scale.txt",
      "Section 2 + idea #2: gpaard vs gpaard_hierarchical across groups=4/6/8"),
-    ("experiments/test_10_adaptive_calibration.py", "results_test10_adaptive_calibration.txt",
+    ("experiments/test_10_adaptive_calibration.py", "results/results_test10_adaptive_calibration.txt",
      "Adaptive selector calibration: real data inside the uncalibrated threshold gap"),
-    ("experiments/test_9_adaptive_selector.py", "results_test9_adaptive_selector.txt",
+    ("experiments/test_9_adaptive_selector.py", "results/results_test9_adaptive_selector.txt",
      "Adaptive selector retrospective validation (no root needed, runs last on purpose)"),
 ]
 
-SUMMARY_PATH = os.path.join(PROJECT_ROOT, "results_tonight_summary.txt")
+SUMMARY_PATH = os.path.join(PROJECT_ROOT, "results/results_tonight_summary.txt")
 
 
 def main():

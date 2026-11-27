@@ -63,7 +63,7 @@ GLOBAL_LINKS = 1
 SETTLE = 1
 TIMEOUT = 60
 PLOTS_DIR = "adversarial_topology_plots_v2"
-OUT_PATH = "results_test4_adversarial.txt"
+OUT_PATH = "results/results_test4_adversarial.txt"
 
 
 def main():

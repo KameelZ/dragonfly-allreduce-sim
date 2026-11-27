@@ -78,8 +78,8 @@ GLOBAL_LINKS = 1
 SETTLE = 1
 PING_COUNT = 150
 PING_INTERVAL = "0.01"
-PLOTS_DIR = "latency_topology_plots"
-OUT_PATH = "results_test6_latency.txt"
+PLOTS_DIR = "plots/latency_topology_plots"
+OUT_PATH = "results/results_test6_latency.txt"
 
 # (case_name -> expected DF+/DF RTT ratio, from link-counting the round
 # trip path; see module docstring for the derivation of each).

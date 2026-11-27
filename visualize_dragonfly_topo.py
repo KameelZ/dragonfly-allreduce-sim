@@ -320,8 +320,8 @@ def plot_topology_grouped(topo, view, filename="topology_grouped.png"):
 # for DragonflyPlusTopo cases, so every test case's structure can be
 # inspected visually alongside its assertions.
 # ---------------------------------------------------------------------------
-DRAGONFLY_PLOTS_DIR = "dragonfly_plots"
-DRAGONFLY_PLUS_PLOTS_DIR = "dragonfly_plus_plots"
+DRAGONFLY_PLOTS_DIR = "plots/dragonfly_plots"
+DRAGONFLY_PLUS_PLOTS_DIR = "plots/dragonfly_plus_plots"
 
 
 def _plots_dir_for(topo):

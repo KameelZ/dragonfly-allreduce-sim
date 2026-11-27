@@ -314,11 +314,11 @@ def parse_args(argv=None):
                         help="seconds to wait after installing flows (default: 1)")
     parser.add_argument("--timeout", type=int, default=60,
                         help="per-message iperf timeout in seconds (default: 60)")
-    parser.add_argument("--out-prefix", type=str, default="results_df_vs_dfplus",
-                        help="results are written to <prefix>.txt (default: results_df_vs_dfplus)")
-    parser.add_argument("--plots-dir", type=str, default="df_vs_dfplus_topology_plots",
+    parser.add_argument("--out-prefix", type=str, default="results/early/results_df_vs_dfplus",
+                        help="results are written to <prefix>.txt (default: results/early/results_df_vs_dfplus)")
+    parser.add_argument("--plots-dir", type=str, default="plots/df_vs_dfplus_topology_plots",
                         help="directory for topology plot images "
-                             "(default: df_vs_dfplus_topology_plots)")
+                             "(default: plots/df_vs_dfplus_topology_plots)")
     args = parser.parse_args(argv)
 
     args.groups = [int(g) for g in args.groups.split(",") if g.strip()]

@@ -374,10 +374,10 @@ def parse_args(argv=None):
                         help="seconds to wait after installing flows (default: 1)")
     parser.add_argument("--timeout", type=int, default=60,
                         help="per-message iperf timeout in seconds (default: 60)")
-    parser.add_argument("--out-prefix", type=str, default="results_asymmetric_groups",
-                        help="results are written to <prefix>.txt (default: results_asymmetric_groups)")
-    parser.add_argument("--plots-dir", type=str, default="asymmetric_topology_plots",
-                        help="directory for topology plot images (default: asymmetric_topology_plots)")
+    parser.add_argument("--out-prefix", type=str, default="results/early/results_asymmetric_groups",
+                        help="results are written to <prefix>.txt (default: results/early/results_asymmetric_groups)")
+    parser.add_argument("--plots-dir", type=str, default="plots/asymmetric_topology_plots",
+                        help="directory for topology plot images (default: plots/asymmetric_topology_plots)")
     args = parser.parse_args(argv)
 
     args.shapes = [s.strip() for s in args.shapes.split(",") if s.strip()]

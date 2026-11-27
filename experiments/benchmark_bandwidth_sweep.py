@@ -275,10 +275,10 @@ def parse_args(argv=None):
     parser.add_argument("--settle", type=int, default=1, help="seconds to wait after installing flows (default: 1)")
     parser.add_argument("--repeat", type=int, default=3, help="iterations per (bandwidth, size) (default: 3)")
     parser.add_argument("--timeout", type=int, default=60, help="per-message iperf timeout in seconds (default: 60)")
-    parser.add_argument("--out-prefix", type=str, default="results_bw_sweep",
-                        help="result files are written to <prefix>_<config>.txt (default: results_bw_sweep)")
-    parser.add_argument("--plots-dir", type=str, default="bandwidth_topology_plots",
-                        help="directory for the topology plot images (default: bandwidth_topology_plots)")
+    parser.add_argument("--out-prefix", type=str, default="results/early/results_bw_sweep",
+                        help="result files are written to <prefix>_<config>.txt (default: results/early/results_bw_sweep)")
+    parser.add_argument("--plots-dir", type=str, default="plots/bandwidth_topology_plots",
+                        help="directory for the topology plot images (default: plots/bandwidth_topology_plots)")
     args = parser.parse_args(argv)
 
     args.bandwidths = [float(b) for b in args.bandwidths.split(",") if b.strip()]

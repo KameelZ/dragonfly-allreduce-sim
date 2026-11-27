@@ -89,8 +89,8 @@ REPEAT = 30
 DELAY = "1ms"
 SETTLE = 1
 TIMEOUT = 60
-PLOTS_DIR = "spine_oversubscription_plots"
-OUT_PATH = "results_test7_spine_oversubscription.txt"
+PLOTS_DIR = "plots/spine_oversubscription_plots"
+OUT_PATH = "results/results_test7_spine_oversubscription.txt"
 
 # (label, topology, spines_override) -- spines_override is None for
 # dragonfly (no spine tier) and for the 1x replication (defaults to width).

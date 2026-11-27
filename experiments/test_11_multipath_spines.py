@@ -76,8 +76,8 @@ REPEAT = 30
 DELAY = "1ms"
 SETTLE = 1
 TIMEOUT = 60
-PLOTS_DIR = "multipath_spines_topology_plots"
-OUT_PATH = "results_test11_multipath_spines.txt"
+PLOTS_DIR = "plots/multipath_spines_topology_plots"
+OUT_PATH = "results/results_test11_multipath_spines.txt"
 
 # Identical variant set to test_7_spine_oversubscription.py -- same dose-
 # response design (1x/2x/4x), so this file's numbers are directly comparable

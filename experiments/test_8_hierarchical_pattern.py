@@ -75,8 +75,8 @@ REPEAT = 30
 DELAY = "1ms"
 SETTLE = 1
 TIMEOUT = 60
-PLOTS_DIR = "hierarchical_pattern_plots"
-OUT_PATH = "results_test8_hierarchical_pattern.txt"
+PLOTS_DIR = "plots/hierarchical_pattern_plots"
+OUT_PATH = "results/results_test8_hierarchical_pattern.txt"
 
 PATTERNS_TO_TEST = ["gpaard", "gpaard_hierarchical"]
 CONFIG_KEY = "hierarchical_compare"  # constant is safe here: (topology, pattern) already

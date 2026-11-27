@@ -703,7 +703,7 @@ def parse_args(argv=None):
     parser.add_argument("--settle", type=int, default=1, help="seconds to wait after installing flows (default: 1)")
     parser.add_argument("--repeat", type=int, default=1, help="repetitions per (pattern, size) to average (default: 1)")
     parser.add_argument("--timeout", type=int, default=60, help="per-message iperf timeout in seconds (default: 60)")
-    parser.add_argument("--out", type=str, default="benchmark_results.txt", help="results file to write (default: benchmark_results.txt)")
+    parser.add_argument("--out", type=str, default="results/benchmark_results.txt", help="results file to write (default: results/benchmark_results.txt)")
     args = parser.parse_args(argv)
 
     args.topologies = [t.strip() for t in args.topologies.split(",") if t.strip()]

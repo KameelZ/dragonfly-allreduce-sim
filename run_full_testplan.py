@@ -35,23 +35,23 @@ PROJECT_ROOT = os.path.dirname(os.path.abspath(__file__))
 
 # (script, expected output file, human description), cheapest/fastest first.
 SECTIONS = [
-    ("experiments/test_5_resource_parity.py", "results_test5_resource_parity.txt",
+    ("experiments/test_5_resource_parity.py", "results/results_test5_resource_parity.txt",
      "Section 5: resource-parity documentation (no root needed, seconds)"),
-    ("experiments/test_0_sanity_identical.py", "results_test0_sanity.txt",
+    ("experiments/test_0_sanity_identical.py", "results/results_test0_sanity.txt",
      "Section 0: measurement-floor sanity check"),
-    ("experiments/test_6_latency_microbenchmark.py", "results_test6_latency.txt",
+    ("experiments/test_6_latency_microbenchmark.py", "results/results_test6_latency.txt",
      "Section 6: per-hop latency microbenchmark (ping-based)"),
-    ("experiments/test_4_adversarial_patterns.py", "results_test4_adversarial.txt",
+    ("experiments/test_4_adversarial_patterns.py", "results/results_test4_adversarial.txt",
      "Section 4: adversarial-pattern sweep (shift, nearest_neighbor)"),
-    ("experiments/test_1_paper_comparable.py", "results_test1_paper_comparable.txt",
+    ("experiments/test_1_paper_comparable.py", "results/results_test1_paper_comparable.txt",
      "Section 1: paper-comparable sweep (headline result)"),
-    ("experiments/test_2_scale_sweep.py", "results_test2_scale.txt",
+    ("experiments/test_2_scale_sweep.py", "results/results_test2_scale.txt",
      "Section 2: scale sweep (groups 4/6/8)"),
-    ("experiments/test_3_mechanism_isolating.py", "results_test3_mechanism.txt",
+    ("experiments/test_3_mechanism_isolating.py", "results/results_test3_mechanism.txt",
      "Section 3: mechanism-isolating sweep + per-link utilization"),
 ]
 
-SUMMARY_PATH = os.path.join(PROJECT_ROOT, "results_testplan_summary.txt")
+SUMMARY_PATH = os.path.join(PROJECT_ROOT, "results/results_testplan_summary.txt")
 
 
 def hygiene():

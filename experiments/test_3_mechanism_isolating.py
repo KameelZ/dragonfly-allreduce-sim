@@ -62,8 +62,8 @@ REPEAT = 30
 DELAY = "1ms"
 SETTLE = 1
 TIMEOUT = 60
-PLOTS_DIR = "mechanism_topology_plots"
-OUT_PATH = "results_test3_mechanism.txt"
+PLOTS_DIR = "plots/mechanism_topology_plots"
+OUT_PATH = "results/results_test3_mechanism.txt"
 
 
 def main():

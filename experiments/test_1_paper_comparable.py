@@ -74,8 +74,8 @@ DELAY = "1ms"
 GLOBAL_LINKS = 1
 SETTLE = 1
 TIMEOUT = 60
-PLOTS_DIR = "paper_comparable_topology_plots"
-OUT_PATH = "results_test1_paper_comparable.txt"
+PLOTS_DIR = "plots/paper_comparable_topology_plots"
+OUT_PATH = "results/results_test1_paper_comparable.txt"
 
 PATTERNS_TO_TEST = ["gpaard", "gpaard_hierarchical"]
 

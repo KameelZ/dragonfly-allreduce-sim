@@ -47,7 +47,7 @@ CONFIGS = [
     (4, 4, 2, 2, "test_3 (global_links=2 variant)"),
 ]
 REFERENCE_BW = 100  # Mbit/s, illustrative only -- every link shares one bw in this project
-OUT_PATH = "results_test5_resource_parity.txt"
+OUT_PATH = "results/results_test5_resource_parity.txt"
 
 
 def counts_by_kind(view):

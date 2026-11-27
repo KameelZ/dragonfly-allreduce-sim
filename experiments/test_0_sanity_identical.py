@@ -50,8 +50,8 @@ DELAY = "1ms"
 GLOBAL_LINKS = 1
 SETTLE = 1
 TIMEOUT = 60
-PLOTS_DIR = "sanity_topology_plots"
-OUT_PATH = "results_test0_sanity.txt"
+PLOTS_DIR = "plots/sanity_topology_plots"
+OUT_PATH = "results/results_test0_sanity.txt"
 
 
 def main():

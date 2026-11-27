@@ -38,12 +38,12 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from benchmark_gpaard import choose_gpaard_pattern_name, parse_size, format_size, ADAPTIVE_TRANSFER_TIME_THRESHOLD_S
 
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-OUT_PATH = os.path.join(PROJECT_ROOT, "results_test9_adaptive_selector.txt")
+OUT_PATH = os.path.join(PROJECT_ROOT, "results/results_test9_adaptive_selector.txt")
 
-TEST1_PATH = os.path.join(PROJECT_ROOT, "results_test1_paper_comparable.txt")
-TEST2_PATH = os.path.join(PROJECT_ROOT, "results_test2_scale.txt")
-TEST8_PATH = os.path.join(PROJECT_ROOT, "results_test8_hierarchical_pattern.txt")
-TEST10_PATH = os.path.join(PROJECT_ROOT, "results_test10_adaptive_calibration.txt")
+TEST1_PATH = os.path.join(PROJECT_ROOT, "results/results_test1_paper_comparable.txt")
+TEST2_PATH = os.path.join(PROJECT_ROOT, "results/results_test2_scale.txt")
+TEST8_PATH = os.path.join(PROJECT_ROOT, "results/results_test8_hierarchical_pattern.txt")
+TEST10_PATH = os.path.join(PROJECT_ROOT, "results/results_test10_adaptive_calibration.txt")
 
 BW_RE = re.compile(r"bw=(\d+)Mbit")
 # No trailing $ anchor: test_1's header lines are exactly "size=1K" with

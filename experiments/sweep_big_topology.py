@@ -264,10 +264,10 @@ def parse_args(argv=None):
     parser.add_argument("--settle", type=int, default=1, help="seconds to wait after installing flows (default: 1)")
     parser.add_argument("--repeat", type=int, default=3, help="iterations per (value, size) (default: 3)")
     parser.add_argument("--timeout", type=int, default=60, help="per-message iperf timeout in seconds (default: 60)")
-    parser.add_argument("--out-prefix", type=str, default="results_bigtopo",
-                        help="result files are written to <prefix>_<axis>.txt (default: results_bigtopo)")
-    parser.add_argument("--plots-dir", type=str, default="big_topology_plots",
-                        help="directory for the topology plot images (default: big_topology_plots)")
+    parser.add_argument("--out-prefix", type=str, default="results/early/results_bigtopo",
+                        help="result files are written to <prefix>_<axis>.txt (default: results/early/results_bigtopo)")
+    parser.add_argument("--plots-dir", type=str, default="plots/big_topology_plots",
+                        help="directory for the topology plot images (default: plots/big_topology_plots)")
     args = parser.parse_args(argv)
 
     args.only = [s.strip() for s in args.only.split(",") if s.strip()]

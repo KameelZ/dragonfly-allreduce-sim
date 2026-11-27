@@ -58,8 +58,8 @@ DELAY = "1ms"
 GLOBAL_LINKS = 1
 SETTLE = 1
 TIMEOUT = 60
-PLOTS_DIR = "scale_topology_plots"
-OUT_PATH = "results_test2_scale.txt"
+PLOTS_DIR = "plots/scale_topology_plots"
+OUT_PATH = "results/results_test2_scale.txt"
 
 PATTERNS_TO_TEST = ["gpaard", "gpaard_hierarchical"]
 
